@@ -1,3 +1,9 @@
+// import Quest from "../../../../server/models/Quest"
+
 export default function Home() {
-    return <h1>Home</h1>
+    return <>
+        <form className="Quests">
+            TestTestTest
+        </form>
+    </>
 }
