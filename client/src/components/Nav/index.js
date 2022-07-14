@@ -38,7 +38,7 @@ export default function Navbar() {
                 Logout
               </a>
               <div className='flex align-middle'>
-                <img src={coin} width={30} className='bg-nav-grey'/>
+                <img src={coin} width={30} className='bg-nav-grey' alt='awake-coin icon'/>
                 <div className='pt-3 pl-1 text-black bg-nav-grey'>{data.me.coins}</div>
               </div>
               <div className='flex align-middle'>
