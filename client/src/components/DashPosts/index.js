@@ -8,17 +8,17 @@ const DashPosts = ({posts, title}) => {
 
     return (
         <div>
-            <h3>{title}</h3>
+            <h3 className="font">{title}</h3>
             {posts && posts.map(post => (
                 <div key={post._id}>
                     <div className='post-title-dash'>
-                        <Link to={`/post/${post._id}`}><h3>{post.postTitle}</h3></Link>
+                        <Link to={`/post/${post._id}`}><h3 className="font">{post.postTitle}</h3></Link>
                     </div>
-                    <div className='post-content-dash'>
-                        <p>{post.postContent}</p>
-                    </div>
+                    {/* <div className='post-content-dash'>
+                        <p className="font">{post.postContent}</p>
+                    </div> */}
                     <div className='post-footer-dash'>
-                        Posted by <Link to={`/profile/${post.username}`}>{post.username}</Link> on {post.createdAt}
+                        <p className="font">Posted on {post.createdAt}</p>
                     </div>
                 </div>
             ))}

@@ -8,14 +8,14 @@ const DashDailies = ({dailies}) => {
     return (
         <div className="daily-div text-black">
             {dailies && dailies.map(daily => (
-                <div className="daily text-black">
-                    
-                <div>
-                    <h4 classname="text-black">{daily.dailyTitle}</h4>
-                </div>
-                <div>
-                    <p>{daily.dailyDescription}</p>
-                </div>
+                <div key={daily._id} className="daily text-black">
+                        
+                    <div>
+                        <h4 className="text-black">{daily.dailyTitle}</h4>
+                    </div>
+                    <div>
+                        <p>{daily.dailyDescription}</p>
+                    </div>
                 </div>
                 
             ))}

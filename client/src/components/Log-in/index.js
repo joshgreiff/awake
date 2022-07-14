@@ -39,10 +39,10 @@ export default function Log(props) {
             <div className="container max-w-sm mx-auto flex-1 flex flex-col items-center justify-center px-2">
                 <div className="bg-white px-6 py-8 rounded shadow-md text-black w-full">
                     <h1 className="mb-8 text-3xl text-center bg-white">Log In</h1>
-                        <form onSubmit={handleFormSubmit} className="bg-white">
+                        <form onSubmit={handleFormSubmit} className="bg-white text-center">
                             <input
                             type="text"
-                            className="block border border-grey-light w-full p-3 rounded mb-4"
+                            className="block border border-grey-light p-3 rounded mb-4 w-5/6 m-auto"
                             name="email"
                             placeholder="Email"
                             value={formState.email}
@@ -50,7 +50,7 @@ export default function Log(props) {
                             />
                             <input
                             type="password"
-                            className="block border border-grey-light w-full p-3 rounded mb-4"
+                            className="block border border-grey-light p-3 rounded mb-4 w-5/6 m-auto"
                             name="password"
                             placeholder="Password"
                             value={formState.password}
@@ -64,7 +64,7 @@ export default function Log(props) {
                             /> */}
                             <button
                             type="submit"
-                            className="w-full text-center py-3 rounded bg-purple-400 text-black hover:bg-green-dark focus:outline-none my-1"
+                            className="w-5/6 text-center py-3 rounded bg-purple-400 text-black hover:bg-green-dark focus:outline-none my-1"
                             >
                             Log In
                             </button>

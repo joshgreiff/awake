@@ -24,34 +24,39 @@ export default function Navbar() {
             <img className="Awake" src={logo} alt="React logo"></img> 
         </Link>
         <ul>
-            <CustomLink to="/Dashboard">Dashboard</CustomLink>
-            <CustomLink to="/Social">Social</CustomLink>
-            <CustomLink to="/Communities">Communities</CustomLink>
-            <CustomLink to="/Shop">Shop</CustomLink>
+            <CustomLink to="/Dashboard" className="font">Dashboard</CustomLink>
+            <CustomLink to="/Social" className="font">Social</CustomLink>
+            <CustomLink to="/Communities" className="font">Communities</CustomLink>
+            <CustomLink to="/Shop" className="font">Shop</CustomLink>
         </ul>
         <ul>
             
             {Auth.loggedIn() ? (
             <>
-              <Link to ="/profile">Me</Link>
-              <a href="/" onClick={logout}>
+              {/* <Link to ="/profile">Me</Link> */}
+              <a href="/" onClick={logout} className="font">
                 Logout
               </a>
               <div className='flex align-middle'>
+<<<<<<< HEAD
                 <img src={coin} width={30} className='bg-nav-grey' alt='awake-coin icon'/>
                 <div className='pt-3 pl-1 text-black bg-nav-grey'>{data.me.coins}</div>
+=======
+                <img src={coin} width={30} className='bg-nav-grey'/>
+                <div className='pt-3 pl-1 text-black bg-nav-grey font'>{data.me.coins}</div>
+>>>>>>> 084c5ec1940abfc924fd3b1f5dc4a542d91dc296
               </div>
               <div className='flex align-middle'>
-                <div className='pt-3 pl-1 text-black bg-nav-grey'>Level:</div>
+                <div className='pt-3 pl-1 text-black bg-nav-grey font'>Level:</div>
                 
-                <div className='pt-3 pl-1 text-black bg-nav-grey'>{data.me.level}</div>
+                <div className='pt-3 pl-1 text-black bg-nav-grey font'>{data.me.level}</div>
               </div> 
             
             </>
           ) : (
             <>
-                <Link to="/Login">Login</Link>
-                <Link to="/Signup">Sign Up!</Link>
+                <Link to="/Login" className='font'>Login</Link>
+                <Link to="/Signup" className='font'>Sign Up!</Link>
             </>
           )}
         </ul>
