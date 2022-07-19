@@ -29,17 +29,18 @@ const dashQuests = ({ quests, milestones, dailies, title }) => {
             <button className="text-white font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-green-600 hover:bg-green-800" type="button" onClick={handleRedirect}>
                 New Quest
             </button>
-
             <div>
                 <br />
-                <h3>{title}</h3>
+                <h3 className="py-1 text-2xl">{title}</h3>
+                <hr />
+                <br />
                 {quests && quests.map(quest => (
                     <div key={quest._id}>
                         <div className="quest-title-dash" >
-                            <h3>{quest.questTitle}</h3>
+                            <h3 className="py-1">{quest.questTitle}</h3>
                         </div>
                         <div className="quest-description-dash">
-                            <p>{quest.questDescription}</p>
+                            <p className="py-1">{quest.questDescription}</p>
                         </div>
                         <p className="text-black">Milestones:</p>
                         <DashMilestone milestones={milestones} />
