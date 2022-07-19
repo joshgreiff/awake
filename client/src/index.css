@@ -13,6 +13,12 @@
   height: 81vh;
 }
 
+.container {
+  padding: 0;
+  margin: 0;
+  max-width: 100vw;
+}
+
 
 body {
   margin: 0;
@@ -21,6 +27,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: rgba(17, 24, 39, var(--tw-bg-opacity));
   padding: 0;
   background-color: rgba(17, 24, 39, var(--tw-bg-opacity));
 }
@@ -67,7 +74,7 @@ body {
 }
 
 .nav li:hover {
-  background-color: #777;
+  color: #777;
 }
 
 code {
@@ -75,6 +82,17 @@ code {
     monospace;
 }
 
+.border-bottom {
+  border-bottom: #555 solid 5px;
+}
+
+.font {
+ font-family: 'Nunito Sans', sans-serif;;
+}
+
+.post-content {
+  min-height: 3rem;
+}
 .test {
   height: 100vh;
 }
@@ -87,6 +105,11 @@ code {
 
 .bg-image {
   padding: 0;
+}
+
+.shopscreen {
+  margin-top: 20px;
+  background-position: center;
   margin: 0;
 }
 
@@ -117,7 +140,7 @@ code {
 .dashboard {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  height: 800px;
+  max-height: 800px;
   gap: 1rem;
 }
 
@@ -132,4 +155,13 @@ code {
     grid-template-columns: 1fr;
     width: 100%;
   }
+}
+
+.profile-pic {
+  height: 4rem;
+  width: 4rem;
+}
+
+.profile-div {
+  width: 5rem;
 }

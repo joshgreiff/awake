@@ -40,10 +40,10 @@ export default function Sign() {
             <div className="container max-w-sm mx-auto flex-1 flex flex-col items-center justify-center px-2">
                 <div className="bg-white px-6 py-8 rounded shadow-md text-black w-full">
                     <h1 className="mb-8 text-3xl text-center bg-white">Sign Up</h1>
-                        <form onSubmit={handleFormSubmit} className="bg-white">
+                        <form onSubmit={handleFormSubmit} className="bg-white text-center">
                             <input
                             type="text"
-                            className="block border border-grey-light w-full p-3 rounded mb-4"
+                            className="block border border-grey-light w-5/6 p-3 rounded mb-4 mx-auto"
                             name="username"
                             placeholder="Username"
                             value={formState.username}
@@ -51,7 +51,7 @@ export default function Sign() {
                             />
                             <input
                             type="text"
-                            className="block border border-grey-light w-full p-3 rounded mb-4"
+                            className="block border border-grey-light w-5/6 p-3 rounded mb-4 mx-auto"
                             name="email"
                             placeholder="Email"
                             value={formState.email}
@@ -59,7 +59,7 @@ export default function Sign() {
                             />
                             <input
                             type="password"
-                            className="block border border-grey-light w-full p-3 rounded mb-4"
+                            className="block border border-grey-light w-5/6 p-3 rounded mb-4 mx-auto"
                             name="password"
                             placeholder="Password"
                             value={formState.password}
@@ -73,7 +73,7 @@ export default function Sign() {
                             /> */}
                             <button
                             type="submit"
-                            className="w-full text-center py-3 rounded bg-purple-400 text-black hover:bg-green-dark focus:outline-none my-1"
+                            className="w-5/6 text-center py-3 rounded bg-purple-400 text-black hover:bg-green-dark focus:outline-none my-1 mx-auto"
                             >
                             Create Account
                             </button>
