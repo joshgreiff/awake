@@ -1,5 +1,7 @@
 
-
+html {
+  height: 100%
+}
 
 * {
   box-sizing: border-box;
@@ -9,6 +11,7 @@
 }
 
 body {
+  height: 100%;
   overflow: hidden;
 }
 
@@ -187,4 +190,12 @@ code {
 
 .h-100vh{
   height:100vh;
+}
+
+#root {
+  height: 100%
+}
+
+.container {
+  height: 100%;
 }

@@ -48,20 +48,20 @@ export default function Modal({ closeModal }){
                     <button onClick={() => closeModal(false)}>X</button>
                 </div>
                 <div className="title text-xl font">
-                    <h2 className="font">Create a Quest</h2>
+                    <h2 className="font">Create an Attribute</h2>
                 </div>
                 
                 <div className="body">
                     
                     <form className='flex flex-col' onSubmit={handleSubmit}>
                         <input className='mb-5 flex "block p-2.5  text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500'
-                        placeholder="Quest Title"
+                        placeholder="Attribute Title"
                         onChange={handleChangeTitle}
 
                         // value={questTitle}
                         ></input>
                         <textarea
-                            placeholder="Quest Description"
+                            placeholder="Attribute Description"
                             // value={questDescription}
                             className='flex "block p-2.5  text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500'
                             onChange={handleChangeDescription}

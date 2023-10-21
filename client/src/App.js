@@ -17,8 +17,10 @@ import Log from './components/Log-in';
 import Profile from './components/Profile'
 // import Hero from './components/Hero';
 import Dashboard from './pages/Dashboard'
+import AvatarCreator from './pages/CreateAvatar'
 import { ReactDOM } from 'react-dom/client';
 import {  BrowserRouter,  Routes,  Route, } from "react-router-dom";
+import CreateAvatar from './pages/CreateAvatar';
 
 
 const httpLink = createHttpLink({
@@ -108,6 +110,8 @@ function App() {
             <Route path="/Login" element= {<Log />} />
             <Route path="/profile" element = {<Profile />} />
             <Route path='/dashboard' element={<Dashboard />} />
+            <Route path='/create-avatar' element={<CreateAvatar />} />
+
             {/* <Route path="/landing" element = {<Landing />} /> */}
           </Routes>
         </div>

@@ -84,7 +84,7 @@ export default function Sign() {
                     Already have an account?
                     <a
                     className="no-underline border-b border-blue text-blue"
-                    href="/login"
+                    href="/Login"
                     >
                         <span> </span>
                     Log in
