@@ -1,0 +1,148 @@
+/* Goal Form Container */
+.goal-form-container {
+    max-width: 600px;
+    margin: auto;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Form Styling */
+  .goal-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  .goal-input, .goal-select {
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+  
+  .add-goal-btn {
+    padding: 8px 15px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .add-goal-btn:hover {
+    background-color: #218838;
+  }
+  
+  /* Goal List */
+  .goal-list {
+    list-style-type: none;
+    padding: 0;
+  }
+  
+  /* Goal Item */
+  .goal-item {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 5px;
+    background: #f9f9f9;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease-in-out;
+  }
+  
+  /* Indentation for sub-goals */
+  .goal-item.level-1 {
+    margin-left: 20px;
+    background: #f1f1f1;
+  }
+  
+  .goal-item.level-2 {
+    margin-left: 40px;
+    background: #e8e8e8;
+  }
+  
+  .goal-item.level-3 {
+    margin-left: 60px;
+    background: #dfdfdf;
+  }
+  
+  /* Expand/Collapse Button */
+  .expand-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: black;
+  }
+  
+  /* Goal Title */
+  .goal-title {
+    font-weight: bold;
+    flex-grow: 1;
+    color: black;
+  }
+  
+  /* Edit Button */
+  .edit-btn {
+    padding: 5px 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .edit-btn:hover {
+    background-color: #0056b3;
+  }
+  
+  /* Save Button */
+  .save-btn {
+    padding: 5px 10px;
+    background-color: #17a2b8;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .save-btn:hover {
+    background-color: #138496;
+  }
+  
+  /* Goal Edit Input */
+  .goal-edit-input {
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    flex-grow: 1;
+  }
+  
+  /* Sub-Goals */
+  .sub-goals {
+    list-style-type: none;
+    padding-left: 20px;
+  }
+  
+  /* Clear Goals Button */
+  .clear-goals-btn {
+    margin-top: 20px;
+    padding: 10px;
+    background: red;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 100%;
+  }
+  
+  .clear-goals-btn:hover {
+    background: darkred;
+  }
+  
