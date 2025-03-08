@@ -35,26 +35,42 @@ const GoalVisualizer = () => {
   useEffect(() => {
     const loadGoals = async () => {
       const goals = await getGoals();
-      const formattedNodes = goals.map((goal) => ({
-        id: goal.id.toString(),
-        data: { label: goal.title },
-        position: { x: 0, y: 0 },
-      }));
-      const formattedEdges = goals
-        .filter((goal) => goal.parentId)
-        .map((goal) => ({
-          id: `e${goal.parentId}-${goal.id}`,
-          source: goal.parentId.toString(),
-          target: goal.id.toString(),
-        }));
-
-      const layoutedNodes = getLayoutedElements(formattedNodes, formattedEdges);
-      setNodes(layoutedNodes);
-      setEdges(formattedEdges);
+      updateGraph(goals);
     };
 
     loadGoals();
+
+    const interval = setInterval(loadGoals, 3000); // Auto-update every 3 seconds
+    return () => clearInterval(interval);
   }, []);
+
+  const updateGraph = (goals) => {
+    const formattedNodes = goals.map((goal) => ({
+      id: goal.id.toString(),
+      data: { label: goal.title },
+      position: { x: 0, y: 0 },
+    }));
+    const formattedEdges = goals
+      .filter((goal) => goal.parentId)
+      .map((goal) => ({
+        id: `e${goal.parentId}-${goal.id}`,
+        source: goal.parentId.toString(),
+        target: goal.id.toString(),
+      }));
+
+    const layoutedNodes = getLayoutedElements(formattedNodes, formattedEdges);
+    setNodes((prevNodes) => {
+      const nodeMap = new Map(prevNodes.map((node) => [node.id, node]));
+      layoutedNodes.forEach((node) => nodeMap.set(node.id, node));
+      return Array.from(nodeMap.values());
+    });
+
+    setEdges((prevEdges) => {
+      const edgeMap = new Map(prevEdges.map((edge) => [edge.id, edge]));
+      formattedEdges.forEach((edge) => edgeMap.set(edge.id, edge));
+      return Array.from(edgeMap.values());
+    });
+  };
 
   return (
     <div style={{ width: "100vw", height: "80vh" }}>
