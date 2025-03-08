@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import NostrAuth from "./components/NostrAuth";
 import GoalForm from "./components/GoalForm";
 import { AwakeIntro, AwakeIntroToggle } from "./components/AwakeIntro";
+import GoalVisualizer from "./components/GoalVisualizer";
+
 
 function App() {
   const [userAuthenticated, setUserAuthenticated] = useState(false);
@@ -32,6 +34,7 @@ function App() {
           </button>
         </>
       )}
+      {userAuthenticated && <GoalVisualizer />}
     </div>
   );
 }
