@@ -9,7 +9,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import dagre from "dagre";
-import { getGoals } from "../storage/indexeddb"; // Import IndexedDB retrieval function
+import { getGoals, updateGoal } from "../storage/indexeddb"; // Import update function
 
 const dagreGraph = new dagre.graphlib.Graph();
 dagreGraph.setGraph({ rankdir: "TB" }); // Top to Bottom layout
@@ -39,16 +39,13 @@ const GoalVisualizer = () => {
     };
 
     loadGoals();
-
-    const interval = setInterval(loadGoals, 3000); // Auto-update every 3 seconds
-    return () => clearInterval(interval);
   }, []);
 
   const updateGraph = (goals) => {
     const formattedNodes = goals.map((goal) => ({
       id: goal.id.toString(),
       data: { label: goal.title },
-      position: { x: 0, y: 0 },
+      position: goal.position || { x: 0, y: 0 }, // Load saved position
     }));
     const formattedEdges = goals
       .filter((goal) => goal.parentId)
@@ -58,18 +55,15 @@ const GoalVisualizer = () => {
         target: goal.id.toString(),
       }));
 
-    const layoutedNodes = getLayoutedElements(formattedNodes, formattedEdges);
-    setNodes((prevNodes) => {
-      const nodeMap = new Map(prevNodes.map((node) => [node.id, node]));
-      layoutedNodes.forEach((node) => nodeMap.set(node.id, node));
-      return Array.from(nodeMap.values());
-    });
+    setNodes(formattedNodes);
+    setEdges(formattedEdges);
+  };
 
-    setEdges((prevEdges) => {
-      const edgeMap = new Map(prevEdges.map((edge) => [edge.id, edge]));
-      formattedEdges.forEach((edge) => edgeMap.set(edge.id, edge));
-      return Array.from(edgeMap.values());
-    });
+  const handleNodeDrag = (event, node) => {
+    setNodes((prevNodes) =>
+      prevNodes.map((n) => (n.id === node.id ? { ...n, position: node.position } : n))
+    );
+    updateGoal(node.id, { position: node.position }); // Save new position in IndexedDB
   };
 
   return (
@@ -79,6 +73,7 @@ const GoalVisualizer = () => {
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeDragStop={handleNodeDrag} // Save position when drag stops
         fitView
       >
         <Controls />
