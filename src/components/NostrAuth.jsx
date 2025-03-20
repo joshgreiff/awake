@@ -23,12 +23,7 @@ const NostrAuth = ({ onAuthSuccess }) => {
     const pk = getPublicKey(sk);
     setPrivateKey(sk);
     setPublicKey(pk);
-    setLoggedIn(true);
-    sessionStorage.setItem("nostrPrivateKey", sk);
-  
-    if (onAuthSuccess) {
-      onAuthSuccess(true);  // ✅ Notify App that login was successful
-    }
+    setShowKeyWarning(true);  // ✅ Show the key warning before login
   };
 
   const handleLogin = (sk, autoLogin = false) => {
@@ -42,7 +37,7 @@ const NostrAuth = ({ onAuthSuccess }) => {
       }
 
       if (onAuthSuccess) {
-        onAuthSuccess();
+        onAuthSuccess(true);
       }
     } catch (error) {
       alert("Invalid Private Key");
@@ -83,38 +78,42 @@ const NostrAuth = ({ onAuthSuccess }) => {
       {!loggedIn ? (
         <div>
           <h2>NOSTR Login</h2>
-          <button onClick={generateKeys}>Generate New Keys</button>
-          <br />
-          <input
-            type="text"
-            placeholder="Enter Private Key"
-            onChange={(e) => handleLogin(e.target.value)}
-          />
-          <button onClick={() => handleLogin(privateKey)}>Login</button>
-          <br />
-          <label>
-            <input
-              type="checkbox"
-              checked={saveKey}
-              onChange={() => setSaveKey(!saveKey)}
-            />
-            Save Private Key for Auto-Login (Less Secure)
-          </label>
-        </div>
-      ) : (
-        <div>
-          <h2>Welcome!</h2>
-          <p><strong>Public Key:</strong> {publicKey}</p>
-          {showKeyWarning && (
+          {showKeyWarning ? (
             <div style={{ background: "#ffcc00", padding: "10px", borderRadius: "5px" }}>
               <p><strong>Important:</strong> Save your private key! You will need it to log in again.</p>
               <p>For maximum security, <strong>write it down on paper</strong> and store it in a safe place. Avoid saving it in cloud-based note-taking apps or as a picture, as these can be hacked.</p>
               <button onClick={copyToClipboard}>Copy Private Key</button>
               <button onClick={downloadKey}>Download Private Key</button>
+              <button onClick={() => handleLogin(privateKey)}>I Have Saved My Key</button>
             </div>
+          ) : (
+            <>
+              <button onClick={generateKeys}>Generate New Keys</button>
+              <br />
+              <input
+                type="text"
+                placeholder="Enter Private Key"
+                onChange={(e) => handleLogin(e.target.value)}
+              />
+              <button onClick={() => handleLogin(privateKey)}>Login</button>
+              <br />
+              <label>
+                <input
+                  type="checkbox"
+                  checked={saveKey}
+                  onChange={() => setSaveKey(!saveKey)}
+                />
+                Save Private Key for Auto-Login (Less Secure)
+              </label>
+            </>
           )}
+        </div>
+      ) : (
+        <div>
+          <h2>Welcome!</h2>
+          <p><strong>Public Key:</strong> {publicKey}</p>
           <button onClick={forgetKey}>Forget Stored Key</button>
-          <button onClick={() => setLoggedIn(false)}>Logout</button>
+          <button onClick={logout}>Logout</button>
         </div>
       )}
     </div>
