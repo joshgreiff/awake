@@ -3,6 +3,7 @@ import NostrAuth from "./components/NostrAuth";
 import GoalForm from "./components/GoalForm";
 import { AwakeIntro, AwakeIntroToggle } from "./components/AwakeIntro";
 import GoalVisualizer from "./components/GoalVisualizer";
+import AIChat from "./components/AIChat";
 
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
         <NostrAuth onAuthSuccess={setUserAuthenticated} />  // ✅ Update App state dynamically
       ) : (
         <>
+          <AIChat />
           <GoalForm />
           <button onClick={() => {
             sessionStorage.removeItem("nostrPrivateKey"); // ✅ Fully clear stored key
