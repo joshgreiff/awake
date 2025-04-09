@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import "../assets/styles/AIChat.css";
+import * as nostrTools from "nostr-tools";
 
 const reflectionPrompts = [
   "What does that mean to you right now?",
@@ -25,7 +26,7 @@ const AIChat = () => {
   const [input, setInput] = useState("");
   const [memory, setMemory] = useState([]); // Track previous user messages
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!input.trim()) return;
 
     const userMessage = { sender: "User", text: input };
@@ -38,7 +39,6 @@ const AIChat = () => {
 
     let aiText = "That's interesting! Can you tell me more?";
 
-    // Check memory for keyword match
     for (let i = updatedMemory.length - 1; i >= 0; i--) {
       const entry = updatedMemory[i].toLowerCase();
       const match = memoryResponses.find(({ keyword }) => entry.includes(keyword));
@@ -48,7 +48,6 @@ const AIChat = () => {
       }
     }
 
-    // Fallback to generic reflection
     if (aiText === "That's interesting! Can you tell me more?") {
       aiText = reflectionPrompts[Math.floor(Math.random() * reflectionPrompts.length)];
     }
@@ -59,6 +58,32 @@ const AIChat = () => {
     };
 
     setTimeout(() => setMessages([...updatedMessages, aiResponse]), 500);
+
+    // Optional: Publish conversation as a Nostr event
+    try {
+      const sk = sessionStorage.getItem("nostrPrivateKey");
+      if (sk) {
+        const relay = nostrTools.relayInit("wss://relay.damus.io");
+        const pk = nostrTools.getPublicKey(sk);
+        await relay.connect();
+
+        const event = {
+          kind: 30000,
+          pubkey: pk,
+          created_at: Math.floor(Date.now() / 1000),
+          tags: [],
+          content: input,
+        };
+
+        event.id = getEventHash(event);
+        event.sig = signEvent(event, sk);
+
+        await relay.publish(event);
+        relay.close();
+      }
+    } catch (error) {
+      console.error("Nostr publish error:", error);
+    }
   };
 
   return (
