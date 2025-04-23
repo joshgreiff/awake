@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { getPublicKey } from "nostr-tools";
-import { utils } from "@noble/secp256k1"; // For generating private keys
+import { utils } from "@noble/secp256k1";
 
-const NostrAuth = ({ onAuthSuccess }) => { 
+const NostrAuth = ({ onAuthSuccess }) => {
   const [privateKey, setPrivateKey] = useState("");
   const [publicKey, setPublicKey] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
@@ -10,7 +10,7 @@ const NostrAuth = ({ onAuthSuccess }) => {
   const [saveKey, setSaveKey] = useState(false);
 
   useEffect(() => {
-    const storedKey = localStorage.getItem("nostrPrivateKey");
+    const storedKey = sessionStorage.getItem("nostrPrivateKey");
     if (storedKey) {
       handleLogin(storedKey, true);
     }
@@ -19,11 +19,11 @@ const NostrAuth = ({ onAuthSuccess }) => {
   const generateKeys = () => {
     const sk = Array.from(utils.randomPrivateKey(), (byte) =>
       byte.toString(16).padStart(2, "0")
-    ).join(""); // Convert bytes to hex manually
+    ).join("");
     const pk = getPublicKey(sk);
     setPrivateKey(sk);
     setPublicKey(pk);
-    setShowKeyWarning(true);  // ✅ Show the key warning before login
+    setShowKeyWarning(true);
   };
 
   const handleLogin = (sk, autoLogin = false) => {
@@ -32,12 +32,13 @@ const NostrAuth = ({ onAuthSuccess }) => {
       setPrivateKey(sk);
       setPublicKey(pk);
       setLoggedIn(true);
+      sessionStorage.setItem("nostrPrivateKey", sk);
       if (!autoLogin && saveKey) {
         localStorage.setItem("nostrPrivateKey", sk);
       }
 
       if (onAuthSuccess) {
-        onAuthSuccess(true);
+        onAuthSuccess(true, pk);
       }
     } catch (error) {
       alert("Invalid Private Key");
@@ -59,18 +60,11 @@ const NostrAuth = ({ onAuthSuccess }) => {
 
   const forgetKey = () => {
     localStorage.removeItem("nostrPrivateKey");
+    sessionStorage.removeItem("nostrPrivateKey");
     setPrivateKey("");
     setPublicKey("");
     setLoggedIn(false);
-  };
-
-  const logout = () => {
-    sessionStorage.removeItem("nostrPrivateKey");  // ✅ Clear the stored key
-    setPrivateKey("");
-    setPublicKey("");
-    if (onAuthSuccess) {
-      onAuthSuccess(false);  // ✅ Notify App.jsx that user logged out
-    }
+    onAuthSuccess(false, null); // properly trigger logout
   };
 
   return (
@@ -80,8 +74,8 @@ const NostrAuth = ({ onAuthSuccess }) => {
           <h2>NOSTR Login</h2>
           {showKeyWarning ? (
             <div style={{ background: "#ffcc00", padding: "10px", borderRadius: "5px" }}>
-              <p><strong>Important:</strong> Save your private key! You will need it to log in again.</p>
-              <p>For maximum security, <strong>write it down on paper</strong> and store it in a safe place. Avoid saving it in cloud-based note-taking apps or as a picture, as these can be hacked.</p>
+              <p><strong>Important:</strong> Save your private key!</p>
+              <p><strong>Write it down</strong> or download it now.</p>
               <button onClick={copyToClipboard}>Copy Private Key</button>
               <button onClick={downloadKey}>Download Private Key</button>
               <button onClick={() => handleLogin(privateKey)}>I Have Saved My Key</button>
@@ -93,7 +87,7 @@ const NostrAuth = ({ onAuthSuccess }) => {
               <input
                 type="text"
                 placeholder="Enter Private Key"
-                onChange={(e) => handleLogin(e.target.value)}
+                onChange={(e) => setPrivateKey(e.target.value)}
               />
               <button onClick={() => handleLogin(privateKey)}>Login</button>
               <br />
@@ -103,7 +97,7 @@ const NostrAuth = ({ onAuthSuccess }) => {
                   checked={saveKey}
                   onChange={() => setSaveKey(!saveKey)}
                 />
-                Save Private Key for Auto-Login (Less Secure)
+                Save Private Key (Auto Login)
               </label>
             </>
           )}
@@ -112,8 +106,7 @@ const NostrAuth = ({ onAuthSuccess }) => {
         <div>
           <h2>Welcome!</h2>
           <p><strong>Public Key:</strong> {publicKey}</p>
-          <button onClick={forgetKey}>Forget Stored Key</button>
-          <button onClick={logout}>Logout</button>
+          <button onClick={forgetKey}>Logout</button>
         </div>
       )}
     </div>

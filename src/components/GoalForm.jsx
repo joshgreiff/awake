@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { addGoal, getGoals, updateGoal, clearGoals } from "../storage/indexeddb";
+import { publishGoalToNostr } from "../utils/nostrPublish";
 import "../assets/styles/GoalForm.css";
 
 const GoalForm = () => {
@@ -19,21 +20,28 @@ const GoalForm = () => {
     fetchGoals();
   }, []);
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!goalTitle.trim()) return;
-
+  
+    const timestamp = Date.now();
     const newGoal = {
-      id: Date.now(), // Temporary unique ID
-      title: goalTitle,
-      parentId: parentId || null, // Ensures top-level goals have null parentId
+      id: timestamp.toString(), // Ensure it's a string for Nostr tag consistency
+      title: goalTitle.trim(),
+      parentId: parentId || null,
+      position: null // Optional: prep for visualizer layout persistence
     };
-    
-    await addGoal(newGoal);
-    setGoals([...goals, newGoal]); // Update local state
-    setGoalTitle(""); // Clear input field
-    setParentId(null); // Reset selection
+  
+    try {
+      await addGoal(newGoal);               // Store locally
+      await publishGoalToNostr(newGoal);    // Publish to Nostr
+      setGoals((prev) => [...prev, newGoal]); // Update UI
+    } catch (error) {
+      console.error("Failed to save goal:", error);
+    }
+  
+    setGoalTitle(""); // Clear form
+    setParentId(null);
   };
 
   // Handle editing a goal
