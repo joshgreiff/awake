@@ -1,9 +1,9 @@
-import { SimplePool } from "nostr-tools";
-
 export const fetchUserGoals = async (pubkey) => {
   if (!pubkey) return []; // 🚫 No key? No fetch attempt.
 
+  const { SimplePool } = await import("nostr-tools/pool"); // ✅ Dynamic import here
   const pool = new SimplePool();
+
   const relays = [
     "wss://relay.damus.io",
     "wss://relay.snort.social",
@@ -13,22 +13,21 @@ export const fetchUserGoals = async (pubkey) => {
 
   const events = [];
   let resolved = false;
+  let subsRemaining = relays.length;
+
+  const safeResolve = () => {
+    if (!resolved) {
+      resolved = true;
+      try {
+        pool.close();
+      } catch (e) {
+        console.warn("Error during pool.close:", e);
+      }
+      resolve(events);
+    }
+  };
 
   return new Promise((resolve) => {
-    let subsRemaining = relays.length;
-
-    const safeResolve = () => {
-      if (!resolved) {
-        resolved = true;
-        try {
-          pool.close(); // ✅ Close ONCE only
-        } catch (e) {
-          console.warn("Error during pool.close:", e);
-        }
-        resolve(events);
-      }
-    };
-
     relays.forEach((relayUrl) => {
       try {
         pool.subscribe(
