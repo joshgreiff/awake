@@ -1,5 +1,3 @@
-import { getEventHash, getPublicKey, signEvent } from "nostr-tools";
-
 const relays = [
   "wss://relay.damus.io",
   "wss://relay.snort.social",
@@ -8,6 +6,7 @@ const relays = [
 ];
 
 export const publishGoalToNostr = async (goal) => {
+  const { getEventHash, getPublicKey, signEvent } = await import("nostr-tools");
   const { relayInit } = await import("nostr-tools/relay");
 
   const sk = sessionStorage.getItem("nostrPrivateKey");
