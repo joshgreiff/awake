@@ -13,12 +13,35 @@ import AboutPage from "./components/AboutPage";
 import HomePage from "./components/HomePage";
 
 function App() {
-  const [showReflection, setShowReflection] = React.useState(false);
-  const [reflectionData, setReflectionData] = React.useState(null);
-  const [userAuthenticated, setUserAuthenticated] = React.useState(false);
+  return (
+    <CuriosityProvider>
+      <BrowserRouter>
+        <NavBar />
+        <Routes>
+          <Route path="/" element={<HomePageWrapper />} />
+          <Route path="/about" element={<AboutPage />} />
+        </Routes>
+      </BrowserRouter>
+    </CuriosityProvider>
+  );
+}
+
+function NavBar() {
+  return (
+    <nav style={{ display: "flex", gap: 16, padding: 12, borderBottom: "1px solid #eee" }}>
+      <Link to="/">Home</Link>
+      <Link to="/about">About</Link>
+    </nav>
+  );
+}
+
+function HomePageWrapper() {
+  const [showReflection, setShowReflection] = useState(false);
+  const [reflectionData, setReflectionData] = useState(null);
+  const [userAuthenticated, setUserAuthenticated] = useState(false);
   const { curiosities } = useCuriosityContext();
 
-  React.useEffect(() => {
+  useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
     const saved = localStorage.getItem(`awake-reflection-${today}`);
     // Only show reflection modal if authenticated and has curiosities
@@ -44,35 +67,22 @@ function App() {
   const handleCancelReflection = () => setShowReflection(false);
 
   return (
-    <CuriosityProvider>
-      <BrowserRouter>
-        <NavBar />
-        <Routes>
-          <Route path="/" element={<>
-            <HomePage onOpenReflection={handleOpenReflection} reflectionData={reflectionData} />
-            {showReflection && userAuthenticated && curiosities.length > 0 && (
-              <DailyReflectionModal
-                curiosities={curiosities}
-                onSave={handleSaveReflection}
-                onCancel={handleCancelReflection}
-                initialSelected={reflectionData?.selectedIds || []}
-                initialNote={reflectionData?.note || ""}
-              />
-            )}
-          </>} />
-          <Route path="/about" element={<AboutPage />} />
-        </Routes>
-      </BrowserRouter>
-    </CuriosityProvider>
-  );
-}
-
-function NavBar() {
-  return (
-    <nav style={{ display: "flex", gap: 16, padding: 12, borderBottom: "1px solid #eee" }}>
-      <Link to="/">Home</Link>
-      <Link to="/about">About</Link>
-    </nav>
+    <>
+      <HomePage
+        onOpenReflection={handleOpenReflection}
+        reflectionData={reflectionData}
+        onAddCuriosity={() => {}}
+      />
+      {showReflection && userAuthenticated && curiosities.length > 0 && (
+        <DailyReflectionModal
+          curiosities={curiosities}
+          onSave={handleSaveReflection}
+          onCancel={handleCancelReflection}
+          initialSelected={reflectionData?.selectedIds || []}
+          initialNote={reflectionData?.note || ""}
+        />
+      )}
+    </>
   );
 }
 
