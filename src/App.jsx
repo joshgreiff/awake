@@ -10,14 +10,56 @@ import { getPublicKey } from "nostr-tools";
 import { CuriosityProvider, useCuriosityContext } from "./context/CuriosityContext";
 import DailyReflectionModal from "./components/DailyReflectionModal";
 import AboutPage from "./components/AboutPage";
+import HomePage from "./components/HomePage";
 
 function App() {
+  const [showReflection, setShowReflection] = React.useState(false);
+  const [reflectionData, setReflectionData] = React.useState(null);
+  const [userAuthenticated, setUserAuthenticated] = React.useState(false);
+  const { curiosities } = useCuriosityContext();
+
+  React.useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const saved = localStorage.getItem(`awake-reflection-${today}`);
+    // Only show reflection modal if authenticated and has curiosities
+    if (userAuthenticated && curiosities.length > 0) {
+      if (!saved) {
+        setShowReflection(true);
+      } else {
+        setReflectionData(JSON.parse(saved));
+      }
+    } else {
+      setShowReflection(false);
+    }
+  }, [userAuthenticated, curiosities]);
+
+  const handleOpenReflection = () => setShowReflection(true);
+  const handleSaveReflection = (selectedIds, note) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const data = { selectedIds, note, date: today };
+    localStorage.setItem(`awake-reflection-${today}`, JSON.stringify(data));
+    setReflectionData(data);
+    setShowReflection(false);
+  };
+  const handleCancelReflection = () => setShowReflection(false);
+
   return (
     <CuriosityProvider>
       <BrowserRouter>
         <NavBar />
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<>
+            <HomePage onOpenReflection={handleOpenReflection} reflectionData={reflectionData} />
+            {showReflection && userAuthenticated && curiosities.length > 0 && (
+              <DailyReflectionModal
+                curiosities={curiosities}
+                onSave={handleSaveReflection}
+                onCancel={handleCancelReflection}
+                initialSelected={reflectionData?.selectedIds || []}
+                initialNote={reflectionData?.note || ""}
+              />
+            )}
+          </>} />
           <Route path="/about" element={<AboutPage />} />
         </Routes>
       </BrowserRouter>
@@ -31,101 +73,6 @@ function NavBar() {
       <Link to="/">Home</Link>
       <Link to="/about">About</Link>
     </nav>
-  );
-}
-
-function Home() {
-  const [userAuthenticated, setUserAuthenticated] = useState(false);
-  const [showIntro, setShowIntro] = useState(true);
-  const [goals, setGoals] = useState([]);
-  const { curiosities } = useCuriosityContext();
-  const [showReflection, setShowReflection] = useState(false);
-  const [reflectionData, setReflectionData] = useState(null);
-
-  useEffect(() => {
-    const storedKey = sessionStorage.getItem("nostrPrivateKey");
-    if (storedKey) {
-      const pubkey = getPublicKey(storedKey);
-      handleAuthSuccess(true, pubkey);
-    }
-  }, []);
-
-  useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const saved = localStorage.getItem(`awake-reflection-${today}`);
-    if (!saved) {
-      setShowReflection(true);
-    } else {
-      setReflectionData(JSON.parse(saved));
-    }
-  }, []);
-
-  const handleAuthSuccess = async (loggedIn, pubkey = null) => {
-    setUserAuthenticated(loggedIn);
-
-    if (!loggedIn) {
-      setGoals([]);
-      return;
-    }
-
-    if (pubkey) {
-      try {
-        const nostrGoals = await fetchUserGoals(pubkey);
-        console.log("Fetched goals from Nostr:", nostrGoals);
-        for (const goal of nostrGoals) {
-          await addGoal(goal);
-        }
-        const storedGoals = await getGoals();
-        setGoals(storedGoals);
-      } catch (error) {
-        console.error("Error fetching Nostr goals:", error);
-      }
-    }
-  };
-
-  const handleLogout = () => {
-    sessionStorage.removeItem("nostrPrivateKey");
-    handleAuthSuccess(false, null);
-  };
-
-  const handleSaveReflection = (selectedIds, note) => {
-    const today = new Date().toISOString().slice(0, 10);
-    const data = { selectedIds, note, date: today };
-    localStorage.setItem(`awake-reflection-${today}`, JSON.stringify(data));
-    setReflectionData(data);
-    setShowReflection(false);
-  };
-
-  const handleOpenReflection = () => setShowReflection(true);
-  const handleCancelReflection = () => setShowReflection(false);
-
-  return (
-    <div>
-      <h1>Awake - Goal Setting App</h1>
-      <button onClick={handleOpenReflection} style={{ marginBottom: 8 }}>Daily Check-In</button>
-      {showReflection && (
-        <DailyReflectionModal
-          curiosities={curiosities}
-          onSave={handleSaveReflection}
-          onCancel={handleCancelReflection}
-          initialSelected={reflectionData?.selectedIds || []}
-          initialNote={reflectionData?.note || ""}
-        />
-      )}
-      {!showIntro && <AwakeIntroToggle onOpen={() => setShowIntro(true)} />}
-      {showIntro && <AwakeIntro onClose={() => setShowIntro(false)} />}
-
-      {!userAuthenticated ? (
-        <NostrAuth key="auth" onAuthSuccess={handleAuthSuccess} />
-      ) : (
-        <>
-          {/* <AIChat /> */}
-          <GoalForm />
-          <button onClick={handleLogout}>Logout</button>
-          <GoalVisualizer goals={goals} />
-        </>
-      )}
-    </div>
   );
 }
 

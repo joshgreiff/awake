@@ -1,6 +1,9 @@
 import React from "react";
+import { useCuriosityContext } from "../context/CuriosityContext";
 
-const HomePage = ({ onOpenReflection, reflectionData }) => {
+const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
+  const { curiosities } = useCuriosityContext();
+
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 0" }}>
       {/* Hero Section */}
@@ -16,14 +19,21 @@ const HomePage = ({ onOpenReflection, reflectionData }) => {
         </p>
       </section>
 
-      {/* Exploration Map (Mind Map) */}
+      {/* Exploration Map (Curiosity Cards) */}
       <section style={{ margin: "40px 0", textAlign: "center" }}>
-        <h3 style={{ marginBottom: 16 }}>Your Exploration Map</h3>
-        <div style={{ minHeight: 320, background: "var(--awake-surface)", borderRadius: "var(--awake-radius)", boxShadow: "var(--awake-shadow)", padding: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {/* Mind map/curiosity garden goes here */}
-          <span style={{ color: "var(--awake-text-muted)" }}>[Mind Map Placeholder]</span>
+        <h3 style={{ marginBottom: 16 }}>Your Curiosities</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 24, justifyContent: "center", minHeight: 120 }}>
+          {curiosities.length === 0 ? (
+            <span style={{ color: "var(--awake-text-muted)" }}>No curiosities yet. Add your first one!</span>
+          ) : (
+            curiosities.map((c) => (
+              <div key={c.id} style={{ background: "var(--awake-card)", borderRadius: "var(--awake-radius)", boxShadow: "var(--awake-shadow)", padding: 24, minWidth: 180, maxWidth: 220, textAlign: "left", display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                <span style={{ fontWeight: 600, fontSize: "1.1rem", color: "var(--awake-text)" }}>{c.title}</span>
+              </div>
+            ))
+          )}
         </div>
-        <button className="add-goal-btn" style={{ marginTop: 20 }}>Add a Curiosity</button>
+        <button className="add-goal-btn" style={{ marginTop: 20 }} onClick={onAddCuriosity}>Add a Curiosity</button>
       </section>
 
       {/* Daily Reflection & Action */}
