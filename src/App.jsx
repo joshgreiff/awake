@@ -39,7 +39,7 @@ function HomePageWrapper() {
   const [showReflection, setShowReflection] = useState(false);
   const [reflectionData, setReflectionData] = useState(null);
   const [userAuthenticated, setUserAuthenticated] = useState(false);
-  const { curiosities } = useCuriosityContext();
+  const { curiosities, addCuriosity } = useCuriosityContext();
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -66,12 +66,22 @@ function HomePageWrapper() {
   };
   const handleCancelReflection = () => setShowReflection(false);
 
+  const handleAddCuriosity = (title) => {
+    const timestamp = Date.now();
+    addCuriosity({
+      id: timestamp.toString(),
+      title,
+      parentId: null,
+      position: null
+    });
+  };
+
   return (
     <>
       <HomePage
         onOpenReflection={handleOpenReflection}
         reflectionData={reflectionData}
-        onAddCuriosity={() => {}}
+        onAddCuriosity={handleAddCuriosity}
       />
       {showReflection && userAuthenticated && curiosities.length > 0 && (
         <DailyReflectionModal

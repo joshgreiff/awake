@@ -5,6 +5,7 @@ const db = new Dexie('AwakeGoalsDB');
 db.version(1).stores({
   goals: 'id,parentId,title,position', // Indexing fields for efficient querying
   edges: 'id,source,target,type', // New store for arbitrary connections
+  reflections: 'id,curiosityId,date,text', // New store for reflections
 });
 
 // Function to add a goal
@@ -57,6 +58,19 @@ export const deleteEdge = async (id) => {
 // Clear all edges
 export const clearEdges = async () => {
   await db.edges.clear();
+};
+
+// --- Reflection functions ---
+export const addReflection = async (reflection) => {
+  await db.reflections.put(reflection);
+};
+
+export const getReflectionsByCuriosity = async (curiosityId) => {
+  return await db.reflections.where('curiosityId').equals(curiosityId).sortBy('date');
+};
+
+export const clearReflections = async () => {
+  await db.reflections.clear();
 };
 
 export default db;
