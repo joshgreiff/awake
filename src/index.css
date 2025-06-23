@@ -1,68 +1,130 @@
+/* Awake Design System */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+  --awake-primary-gradient: linear-gradient(90deg, #7F5AF0 0%, #2CB67D 100%);
+  --awake-primary: #7F5AF0;
+  --awake-primary-alt: #2CB67D;
+  --awake-accent: #FFD803;
+  --awake-bg: #16161A;
+  --awake-surface: #242629;
+  --awake-text: #FFFFFE;
+  --awake-text-muted: #A7A9BE;
+  --awake-card: #232946;
+  --awake-border: #393A4B;
+  --awake-radius: 16px;
+  --awake-shadow: 0 4px 24px 0 rgba(0,0,0,0.12);
+  --awake-font: 'Inter', 'Nunito', 'Segoe UI', 'Arial', sans-serif;
 }
 
 body {
+  background: var(--awake-bg);
+  color: var(--awake-text);
+  font-family: var(--awake-font);
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
   min-height: 100vh;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+nav {
+  background: var(--awake-surface);
+  color: var(--awake-text);
+  padding: 12px 24px;
+  border-radius: var(--awake-radius);
+  margin: 16px auto 24px auto;
+  max-width: 900px;
+  box-shadow: var(--awake-shadow);
+  display: flex;
+  gap: 24px;
+  align-items: center;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+nav a {
+  color: var(--awake-accent);
+  text-decoration: none;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: color 0.2s;
+}
+nav a:hover {
+  color: var(--awake-primary);
+}
+
+button, .add-goal-btn {
+  background: var(--awake-primary-gradient);
+  color: var(--awake-text);
+  border: none;
+  border-radius: var(--awake-radius);
+  padding: 10px 22px;
+  font-size: 1rem;
+  font-family: var(--awake-font);
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.25s;
+  box-shadow: var(--awake-shadow);
+  transition: background 0.2s, box-shadow 0.2s;
 }
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+button:hover, .add-goal-btn:hover {
+  background: var(--awake-primary-alt);
+  color: var(--awake-bg);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+input, select, textarea {
+  background: var(--awake-surface);
+  color: var(--awake-text);
+  border: 1px solid var(--awake-border);
+  border-radius: var(--awake-radius);
+  padding: 10px;
+  font-size: 1rem;
+  font-family: var(--awake-font);
+  margin-bottom: 8px;
+  outline: none;
+  transition: border 0.2s;
+}
+input:focus, select:focus, textarea:focus {
+  border: 1.5px solid var(--awake-primary);
+}
+
+.awake-intro, .modal-content, .goal-form-container, .goal-list, .curiosity-list-modal {
+  background: var(--awake-card);
+  color: var(--awake-text);
+  border-radius: var(--awake-radius);
+  box-shadow: var(--awake-shadow);
+  padding: 32px 24px;
+  margin: 24px auto;
+  max-width: 600px;
+}
+
+.clear-goals-btn {
+  background: none;
+  color: var(--awake-accent);
+  border: 1px solid var(--awake-accent);
+  margin-top: 12px;
+}
+.clear-goals-btn:hover {
+  background: var(--awake-accent);
+  color: var(--awake-bg);
+}
+
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(22, 22, 26, 0.85);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Misc */
+h1, h2, h3 {
+  font-family: var(--awake-font);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: var(--awake-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--awake-primary);
+  border-radius: 8px;
 }

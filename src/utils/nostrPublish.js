@@ -1,13 +1,5 @@
-const relays = [
-  "wss://relay.damus.io",
-  "wss://relay.snort.social",
-  "wss://nos.lol",
-  "wss://nostr.wine",
-];
-
 export const publishGoalToNostr = async (goal) => {
-  const { getEventHash, getPublicKey, signEvent } = await import("nostr-tools");
-  const { relayInit } = await import("nostr-tools/relay");
+  const { SimplePool, getEventHash, getPublicKey, signEvent } = await import("nostr-tools");
 
   const sk = sessionStorage.getItem("nostrPrivateKey");
   const pk = getPublicKey(sk);
@@ -23,25 +15,27 @@ export const publishGoalToNostr = async (goal) => {
   event.id = getEventHash(event);
   event.sig = signEvent(event, sk);
 
-  for (const url of relays) {
+  const pool = new SimplePool();
+  const relays = [
+    "wss://relay.damus.io",
+    "wss://relay.snort.social",
+    "wss://nos.lol",
+    "wss://nostr.wine",
+  ];
+
+  for (const relay of relays) {
     try {
-      const relay = relayInit(url);
-      await relay.connect();
-
-      relay.on("connect", () => {
-        console.log(`✅ Connected to ${url}`);
-        const pub = relay.publish(event);
-        pub.on("ok", () => console.log(`🎯 Event accepted by ${url}`));
-        pub.on("failed", (reason) =>
-          console.warn(`❌ Failed on ${url}:`, reason)
-        );
-      });
-
-      relay.on("error", () => {
-        console.warn(`⚠️ Relay error on ${url}`);
-      });
-    } catch (err) {
-      console.error(`Error connecting to relay ${url}`, err);
+      const pub = pool.publish(relay, event);
+      pub.on("ok", () => console.log(`✅ Goal published to ${relay}`));
+      pub.on("failed", (reason) =>
+        console.warn(`❌ Failed publishing to ${relay}:`, reason)
+      );
+    } catch (error) {
+      console.error(`Publish error to ${relay}`, error);
     }
   }
+
+  setTimeout(() => {
+    pool.close();
+  }, 5000); // ⏳ Safety close after publishing
 };

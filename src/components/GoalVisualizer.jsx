@@ -9,7 +9,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import dagre from "dagre";
-import { getGoals, updateGoal } from "../storage/indexeddb"; // Import update function
+import { useCuriosityContext } from "../context/CuriosityContext";
 
 const dagreGraph = new dagre.graphlib.Graph();
 dagreGraph.setGraph({ rankdir: "TB" }); // Top to Bottom layout
@@ -29,51 +29,53 @@ const getLayoutedElements = (nodes, edges) => {
 };
 
 const GoalVisualizer = () => {
+  const { curiosities, edges, addCuriosityEdge, updateCuriosity } = useCuriosityContext();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [edgeList, setEdgeList, onEdgesChange] = useEdgesState([]);
 
+  // Sync nodes and edges from context
   useEffect(() => {
-    const loadGoals = async () => {
-      const goals = await getGoals();
-      updateGraph(goals);
-    };
-
-    loadGoals();
-  }, []);
-
-  const updateGraph = (goals) => {
-    const formattedNodes = goals.map((goal) => ({
-      id: goal.id.toString(),
-      data: { label: goal.title },
-      position: goal.position || { x: 0, y: 0 }, // Load saved position
-    }));
-    const formattedEdges = goals
-      .filter((goal) => goal.parentId)
-      .map((goal) => ({
-        id: `e${goal.parentId}-${goal.id}`,
-        source: goal.parentId.toString(),
-        target: goal.id.toString(),
-      }));
-
-    setNodes(formattedNodes);
-    setEdges(formattedEdges);
-  };
+    setNodes(curiosities.map((curiosity) => ({
+      id: curiosity.id.toString(),
+      data: { label: curiosity.title },
+      position: curiosity.position || { x: 0, y: 0 },
+    })));
+    setEdgeList(edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      type: edge.type || 'default',
+    })));
+  }, [curiosities, edges]);
 
   const handleNodeDrag = (event, node) => {
     setNodes((prevNodes) =>
       prevNodes.map((n) => (n.id === node.id ? { ...n, position: node.position } : n))
     );
-    updateGoal(node.id, { position: node.position }); // Save new position in IndexedDB
+    updateCuriosity(node.id, { position: node.position });
+  };
+
+  // Handle new edge creation
+  const handleConnect = async (params) => {
+    const newEdge = {
+      id: `e${params.source}-${params.target}-${Date.now()}`,
+      source: params.source,
+      target: params.target,
+      type: 'default',
+    };
+    await addCuriosityEdge(newEdge);
+    // setEdgeList will update via context effect
   };
 
   return (
     <div style={{ width: "100vw", height: "80vh" }}>
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={edgeList}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onNodeDragStop={handleNodeDrag} // Save position when drag stops
+        onNodeDragStop={handleNodeDrag}
+        onConnect={handleConnect}
         fitView
       >
         <Controls />

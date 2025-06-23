@@ -16,6 +16,7 @@
     "nostr-tools": "github:jb55/nostr-tools",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-router-dom": "^6.30.1",
     "reactflow": "^11.11.4"
   },
   "devDependencies": {

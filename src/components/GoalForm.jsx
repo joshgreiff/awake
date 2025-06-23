@@ -1,86 +1,65 @@
-import React, { useState, useEffect } from "react";
-import { addGoal, getGoals, updateGoal, clearGoals } from "../storage/indexeddb";
-import { publishGoalToNostr } from "../utils/nostrPublish";
+import React, { useState } from "react";
+import { useCuriosityContext } from "../context/CuriosityContext";
 import "../assets/styles/GoalForm.css";
 
 const GoalForm = () => {
   const [goalTitle, setGoalTitle] = useState("");
-  const [goals, setGoals] = useState([]);
   const [editingGoalId, setEditingGoalId] = useState(null);
   const [editingGoalTitle, setEditingGoalTitle] = useState("");
   const [parentId, setParentId] = useState(null);
   const [expandedGoals, setExpandedGoals] = useState({});
 
-  // Load goals from IndexedDB on mount
-  useEffect(() => {
-    const fetchGoals = async () => {
-      const storedGoals = await getGoals();
-      setGoals(storedGoals);
-    };
-    fetchGoals();
-  }, []);
+  const { curiosities, addCuriosity, updateCuriosity, clearCuriosities } = useCuriosityContext();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!goalTitle.trim()) return;
-  
     const timestamp = Date.now();
-    const newGoal = {
-      id: timestamp.toString(), // Ensure it's a string for Nostr tag consistency
+    const newCuriosity = {
+      id: timestamp.toString(),
       title: goalTitle.trim(),
       parentId: parentId || null,
-      position: null // Optional: prep for visualizer layout persistence
+      position: null
     };
-  
     try {
-      await addGoal(newGoal);               // Store locally
-      await publishGoalToNostr(newGoal);    // Publish to Nostr
-      setGoals((prev) => [...prev, newGoal]); // Update UI
+      await addCuriosity(newCuriosity);
     } catch (error) {
-      console.error("Failed to save goal:", error);
+      console.error("Failed to save curiosity:", error);
     }
-  
-    setGoalTitle(""); // Clear form
+    setGoalTitle("");
     setParentId(null);
   };
 
-  // Handle editing a goal
-  const handleEdit = (goal) => {
-    setEditingGoalId(goal.id);
-    setEditingGoalTitle(goal.title);
+  const handleEdit = (curiosity) => {
+    setEditingGoalId(curiosity.id);
+    setEditingGoalTitle(curiosity.title);
   };
 
-  // Handle saving the edited goal
   const handleSaveEdit = async (id) => {
     if (!editingGoalTitle.trim()) return;
-    await updateGoal(id, { title: editingGoalTitle });
-    setGoals(goals.map(goal => goal.id === id ? { ...goal, title: editingGoalTitle } : goal));
+    await updateCuriosity(id, { title: editingGoalTitle });
     setEditingGoalId(null);
     setEditingGoalTitle("");
   };
 
-  // Handle clearing all goals
-  const handleClearGoals = async () => {
-    await clearGoals();
-    setGoals([]); // Reset local state
+  const handleClearCuriosities = async () => {
+    await clearCuriosities();
   };
 
-  // Toggle sub-goal visibility
-  const toggleExpand = (goalId) => {
+  const toggleExpand = (curiosityId) => {
     setExpandedGoals(prev => ({
       ...prev,
-      [goalId]: !prev[goalId]
+      [curiosityId]: !prev[curiosityId]
     }));
   };
 
-  // Render goals recursively with improved sub-goal indentation
-  const renderGoals = (parentId = null, level = 0) => {
-    return goals.filter(goal => goal.parentId === parentId).map(goal => (
-      <li key={goal.id} className={`goal-item level-${level}`}>
-        <button className="expand-btn" onClick={() => toggleExpand(goal.id)}>
-          {expandedGoals[goal.id] ? "▼" : "▶"}
+  const renderCuriosities = (parentId = null, level = 0) => {
+    return curiosities.filter(c => c.parentId === parentId).map(curiosity => (
+      <li key={curiosity.id} className={`goal-item level-${level}`}>
+        <button className="expand-btn" onClick={() => toggleExpand(curiosity.id)}>
+          {expandedGoals[curiosity.id] ? "▼" : "▶"}
         </button>
-        {editingGoalId === goal.id ? (
+        {editingGoalId === curiosity.id ? (
           <>
             <input
               type="text"
@@ -88,41 +67,41 @@ const GoalForm = () => {
               onChange={(e) => setEditingGoalTitle(e.target.value)}
               className="goal-edit-input"
             />
-            <button className="save-btn" onClick={() => handleSaveEdit(goal.id)}>Save</button>
+            <button className="save-btn" onClick={() => handleSaveEdit(curiosity.id)}>Save</button>
           </>
         ) : (
           <>
-            <span className="goal-title">{goal.title}</span> 
-            <button className="edit-btn" onClick={() => handleEdit(goal)}>Edit</button>
+            <span className="goal-title">{curiosity.title}</span> 
+            <button className="edit-btn" onClick={() => handleEdit(curiosity)}>Edit</button>
           </>
         )}
-        {expandedGoals[goal.id] && <ul className="sub-goals">{renderGoals(goal.id, level + 1)}</ul>}
+        {expandedGoals[curiosity.id] && <ul className="sub-goals">{renderCuriosities(curiosity.id, level + 1)}</ul>}
       </li>
     ));
   };
 
   return (
     <div className="goal-form-container">
-      <h2>Set a New Goal</h2>
+      <h2>Add a New Curiosity</h2>
       <form onSubmit={handleSubmit} className="goal-form">
         <input
           type="text"
           value={goalTitle}
           onChange={(e) => setGoalTitle(e.target.value)}
-          placeholder="Enter goal..."
+          placeholder="What are you curious about, want to explore, or might work on?"
           className="goal-input"
         />
         <select onChange={(e) => setParentId(e.target.value ? Number(e.target.value) : null)} className="goal-select">
-          <option value="">No Parent (Top-Level Goal)</option>
-          {goals.map((goal) => (
-            <option key={goal.id} value={goal.id}>{goal.title}</option>
+          <option value="">No Parent (Top-Level Curiosity)</option>
+          {curiosities.map((curiosity) => (
+            <option key={curiosity.id} value={curiosity.id}>{curiosity.title}</option>
           ))}
         </select>
-        <button type="submit" className="add-goal-btn">Add Goal</button>
+        <button type="submit" className="add-goal-btn">Add Curiosity</button>
       </form>
-      <h3>Your Goals</h3>
-      <ul className="goal-list">{renderGoals()}</ul>
-      <button onClick={handleClearGoals} className="clear-goals-btn">Clear All Goals</button>
+      <h3>Your Curiosities</h3>
+      <ul className="goal-list">{renderCuriosities()}</ul>
+      <button onClick={handleClearCuriosities} className="clear-goals-btn">Clear All Curiosities</button>
     </div>
   );
 };
