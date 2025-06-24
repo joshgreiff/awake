@@ -25,6 +25,23 @@ const STAT_ICONS = {
   resilience: "🔥",
 };
 
+// Add styles for micro-animations
+const cardAnim = {
+  transition: 'transform 0.18s cubic-bezier(.4,2,.6,1), box-shadow 0.18s',
+  willChange: 'transform',
+};
+const cardHoverAnim = {
+  transform: 'scale(1.035)',
+  boxShadow: '0 6px 32px 0 #0002, 0 1.5px 8px 0 #7F5AF055',
+  zIndex: 2,
+};
+const pulseAnim = {
+  animation: 'pulseBtn 0.4s',
+};
+const statPulseAnim = {
+  animation: 'statPulse 0.7s',
+};
+
 const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
   const { curiosities, updateCuriosity, deleteCuriosity } = useCuriosityContext();
   const [showAddModal, setShowAddModal] = useState(false);
@@ -52,6 +69,8 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
   const [confetti, setConfetti] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [donePulseId, setDonePulseId] = useState(null);
+  const [hoveredCardId, setHoveredCardId] = useState(null);
 
   // Placeholder values for level and XP
   const level = 3;
@@ -160,6 +179,8 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
   }
 
   const handleMarkHabitDone = async (habit) => {
+    setDonePulseId(habit.id);
+    setTimeout(() => setDonePulseId(null), 400);
     const today = new Date().toISOString().slice(0, 10);
     if (habit.lastCompleted && habit.lastCompleted.slice(0, 10) === today) return;
     // Update streak
@@ -227,8 +248,28 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
             <div key={stat.key} style={{ textAlign: "center", transition: "0.3s", minWidth: 90 }}>
               <div style={{ fontSize: 22 }}>{stat.emoji}</div>
               <div className="homepage-stat-label" style={{ fontWeight: 600, color: "#FFD803" }}>{stat.label}</div>
-              <div className="homepage-stat-bar" style={{ background: "#393A4B", borderRadius: 8, height: 8, width: 80, margin: "6px auto", boxShadow: statBuffed && statBuffed.includes(stat.key) ? `0 0 10px 2px #FFD803` : undefined, transition: "box-shadow 0.3s" }}>
-                <div style={{ background: "#FFD803", height: 8, borderRadius: 8, width: `${stats[stat.key] || 0}%`, transition: "width 0.5s" }} />
+              <div
+                className="homepage-stat-bar"
+                style={{
+                  background: "#393A4B",
+                  borderRadius: 8,
+                  height: 8,
+                  width: 80,
+                  margin: "6px auto",
+                  boxShadow: statBuffed && statBuffed.includes(stat.key) ? `0 0 10px 2px #FFD803` : undefined,
+                  transition: "box-shadow 0.3s",
+                  ...(statBuffed && statBuffed.includes(stat.key) ? statPulseAnim : {}),
+                }}
+              >
+                <div
+                  style={{
+                    background: "#FFD803",
+                    height: 8,
+                    borderRadius: 8,
+                    width: `${stats[stat.key] || 0}%`,
+                    transition: "width 0.5s",
+                  }}
+                />
               </div>
               <div className="homepage-stat-value" style={{ fontSize: 13, color: "var(--awake-text-muted)" }}>{stats[stat.key] || 0} / 100</div>
             </div>
@@ -456,7 +497,28 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 20, justifyContent: "center" }}>
             {habits.map(habit => (
-              <div key={habit.id} style={{ background: "var(--awake-card)", borderRadius: 16, boxShadow: "var(--awake-shadow)", padding: 20, minWidth: 200, maxWidth: 240, textAlign: "left", position: "relative", border: "1.5px solid #7F5AF0", transition: "box-shadow 0.2s, border 0.2s", display: "flex", flexDirection: "column", gap: 4 }}>
+              <div
+                key={habit.id}
+                style={{
+                  ...cardAnim,
+                  ...(hoveredCardId === habit.id ? cardHoverAnim : {}),
+                  background: "var(--awake-card)",
+                  borderRadius: 16,
+                  boxShadow: "var(--awake-shadow)",
+                  padding: 20,
+                  minWidth: 200,
+                  maxWidth: 240,
+                  textAlign: "left",
+                  position: "relative",
+                  border: "1.5px solid #7F5AF0",
+                  transition: 'box-shadow 0.2s, border 0.2s, transform 0.18s cubic-bezier(.4,2,.6,1)',
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                }}
+                onMouseEnter={() => setHoveredCardId(habit.id)}
+                onMouseLeave={() => setHoveredCardId(null)}
+              >
                 <div style={{ fontWeight: 700, fontSize: "1.13rem", marginBottom: 2 }}>{habit.title}</div>
                 {habit.curiosityId && (
                   <div style={{ fontSize: 12, color: "#2CB67D", marginBottom: 2, display: "flex", alignItems: "center", gap: 4 }}>
@@ -473,7 +535,12 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
                   )) : <span style={{ color: "var(--awake-text-muted)", fontSize: 12 }}>No buffs</span>}
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                  <button className="add-goal-btn" style={{ fontSize: 13, borderRadius: 16, padding: "4px 14px", display: "flex", alignItems: "center", gap: 4 }} onClick={() => handleMarkHabitDone(habit)} disabled={habit.lastCompleted && habit.lastCompleted.slice(0, 10) === new Date().toISOString().slice(0, 10)}>
+                  <button
+                    className="add-goal-btn"
+                    style={{ fontSize: 13, borderRadius: 16, padding: "4px 14px", display: "flex", alignItems: "center", gap: 4, ...(donePulseId === habit.id ? pulseAnim : {}) }}
+                    onClick={() => handleMarkHabitDone(habit)}
+                    disabled={habit.lastCompleted && habit.lastCompleted.slice(0, 10) === new Date().toISOString().slice(0, 10)}
+                  >
                     <span role="img" aria-label="check">✔️</span>
                     {habit.lastCompleted && habit.lastCompleted.slice(0, 10) === new Date().toISOString().slice(0, 10) ? "Done" : "Mark as Done"}
                   </button>
@@ -504,6 +571,7 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
           onClose={() => { setShowAddHabitModal(false); setEditingHabit(null); }}
           onHabitAdded={editingHabit ? (updated => setHabits(habits => habits.map(h => h.id === updated.id ? updated : h))) : handleHabitAdded}
           editingHabit={editingHabit}
+          userStats={userStats}
         />
       )}
 
@@ -529,7 +597,7 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
   );
 };
 
-function AddHabitModal({ onClose, onHabitAdded, editingHabit }) {
+function AddHabitModal({ onClose, onHabitAdded, editingHabit, userStats }) {
   const { curiosities } = useCuriosityContext();
   const [title, setTitle] = useState(editingHabit ? editingHabit.title : "");
   const [curiosityId, setCuriosityId] = useState(editingHabit ? editingHabit.curiosityId || "" : "");
@@ -565,7 +633,7 @@ function AddHabitModal({ onClose, onHabitAdded, editingHabit }) {
   };
   return (
     <div className="modal-backdrop" style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <form onSubmit={handleSubmit} style={{ background: "#232136", borderRadius: 18, padding: 32, minWidth: 320, boxShadow: "var(--awake-shadow)", position: "relative" }}>
+      <form onSubmit={handleSubmit} style={{ background: "#232136", borderRadius: 18, padding: 32, width: "90vw", maxWidth: 520, boxShadow: "var(--awake-shadow)", position: "relative" }}>
         <button type="button" onClick={onClose} style={{ position: "absolute", top: 12, right: 12, background: "none", border: "none", fontSize: 22, color: "#FFD803", cursor: "pointer" }} aria-label="Close">×</button>
         <h3 style={{ marginTop: 0 }}>{editingHabit ? "Edit Habit" : "Add Habit"}</h3>
         <label style={{ display: "block", marginBottom: 10 }}>
@@ -668,7 +736,7 @@ function StatSettingsModal({ onClose }) {
   };
   return (
     <div className="modal-backdrop" style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", background: "rgba(0,0,0,0.4)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#232136", borderRadius: 18, padding: 32, minWidth: 400, maxWidth: 520, boxShadow: "var(--awake-shadow)", position: "relative", maxHeight: "80vh", overflowY: "auto" }}>
+      <div style={{ background: "#232136", borderRadius: 18, padding: 32, width: "90vw", maxWidth: 520, boxShadow: "var(--awake-shadow)", position: "relative", maxHeight: "80vh", overflowY: "auto" }}>
         <button type="button" onClick={onClose} style={{ position: "absolute", top: 12, right: 12, background: "none", border: "none", fontSize: 22, color: "#FFD803", cursor: "pointer" }} aria-label="Close">×</button>
         <h2 style={{ marginTop: 0, marginBottom: 18 }}>Choose Your Stats</h2>
         <div style={{ fontSize: 15, color: "var(--awake-text-muted)", marginBottom: 16 }}>Pick 3–5 qualities you want to grow or feel more of. You can add your own!</div>
@@ -709,5 +777,21 @@ function StatSettingsModal({ onClose }) {
     </div>
   );
 }
+
+// Add keyframes for pulse
+const style = document.createElement('style');
+style.innerHTML = `
+@keyframes pulseBtn {
+  0% { box-shadow: 0 0 0 0 #2CB67D55; }
+  70% { box-shadow: 0 0 0 8px #2CB67D11; }
+  100% { box-shadow: 0 0 0 0 #2CB67D00; }
+}
+@keyframes statPulse {
+  0% { filter: brightness(1.2); }
+  50% { filter: brightness(1.5); }
+  100% { filter: brightness(1); }
+}
+`;
+document.head.appendChild(style);
 
 export default HomePage; 
