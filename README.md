@@ -1,3 +1,7 @@
+# Awake Mission
+
+A personalized, evolving, self-development system that helps users become the most aligned version of themselves through accountability, habit-building, community, and intelligent guidance.
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

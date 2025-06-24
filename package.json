@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@noble/secp256k1": "^2.2.3",
+    "canvas-confetti": "^1.9.3",
     "dagre": "^0.8.5",
     "dexie": "^4.0.11",
+    "emoji-picker-react": "^4.12.2",
     "nostr-tools": "github:jb55/nostr-tools",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

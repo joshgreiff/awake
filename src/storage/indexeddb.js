@@ -6,6 +6,7 @@ db.version(1).stores({
   goals: 'id,parentId,title,position', // Indexing fields for efficient querying
   edges: 'id,source,target,type', // New store for arbitrary connections
   reflections: 'id,curiosityId,date,text', // New store for reflections
+  habits: 'id,title,curiosityId,createdAt,streak,lastCompleted', // New store for habits
 });
 
 // Function to add a goal
@@ -71,6 +72,31 @@ export const getReflectionsByCuriosity = async (curiosityId) => {
 
 export const clearReflections = async () => {
   await db.reflections.clear();
+};
+
+// --- Habit functions ---
+export const addHabit = async (habit) => {
+  // Ensure buffs is always an array
+  if (!Array.isArray(habit.buffs)) habit.buffs = [];
+  await db.habits.put(habit);
+};
+
+export const getHabits = async () => {
+  return await db.habits.toArray();
+};
+
+export const updateHabit = async (id, updates) => {
+  // Ensure buffs is always an array if present
+  if (updates.buffs && !Array.isArray(updates.buffs)) updates.buffs = [];
+  await db.habits.update(id, updates);
+};
+
+export const deleteHabit = async (id) => {
+  await db.habits.delete(id);
+};
+
+export const clearHabits = async () => {
+  await db.habits.clear();
 };
 
 export default db;

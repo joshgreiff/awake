@@ -128,3 +128,243 @@ h1, h2, h3 {
   background: var(--awake-primary);
   border-radius: 8px;
 }
+
+/* Mobile Responsive Styles */
+@media (max-width: 767px) {
+  /* Container padding */
+  .homepage-container {
+    padding: 16px !important;
+  }
+  
+  /* Top section - stack vertically on mobile */
+  .homepage-top-section {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 24px !important;
+  }
+  
+  /* Avatar sizing for mobile */
+  .homepage-avatar {
+    font-size: 48px !important;
+    width: 64px !important;
+    height: 64px !important;
+  }
+  
+  /* Level text sizing */
+  .homepage-level {
+    font-size: 20px !important;
+  }
+  
+  /* XP bar width */
+  .homepage-xp-bar {
+    width: 100px !important;
+  }
+  
+  /* Stats grid layout for mobile */
+  .homepage-stats {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 16px !important;
+    width: 100% !important;
+    max-width: 400px !important;
+  }
+  
+  .homepage-stat-label {
+    font-size: 14px !important;
+  }
+  
+  .homepage-stat-bar {
+    height: 6px !important;
+    width: 100% !important;
+    max-width: 60px !important;
+  }
+  
+  .homepage-stat-value {
+    font-size: 12px !important;
+  }
+  
+  /* Launch buttons - stack vertically */
+  .homepage-launch-buttons {
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+  
+  .homepage-launch-btn {
+    font-size: 18px !important;
+    padding: 16px 24px !important;
+  }
+  
+  /* Section headings */
+  .homepage-section-heading {
+    font-size: 20px !important;
+  }
+  
+  /* Info button sizing */
+  .homepage-info-btn {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 14px !important;
+    line-height: 18px !important;
+  }
+  
+  .homepage-info-tooltip {
+    min-width: 200px !important;
+    max-width: 280px !important;
+  }
+  
+  /* Curiosity cards - single column grid */
+  .homepage-curiosities-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  
+  .homepage-curiosity-card {
+    padding: 20px !important;
+    width: 100% !important;
+  }
+  
+  .homepage-curiosity-title {
+    font-size: 1rem !important;
+  }
+  
+  .homepage-curiosity-btn {
+    font-size: 16px !important;
+  }
+  
+  .homepage-curiosity-menu-btn {
+    font-size: 20px !important;
+  }
+  
+  /* Modal content margins */
+  .homepage-modal-content {
+    margin: 16px !important;
+  }
+  
+  /* Progress section text */
+  .homepage-progress-heading {
+    font-size: 20px !important;
+  }
+  
+  .homepage-progress-text {
+    font-size: 1rem !important;
+  }
+  
+  .homepage-progress-quote {
+    font-size: 16px !important;
+  }
+}
+
+/* Desktop styles (768px and up) */
+@media (min-width: 768px) {
+  .homepage-container {
+    padding: 32px 0 !important;
+  }
+  
+  .homepage-top-section {
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+  
+  .homepage-avatar {
+    font-size: 64px !important;
+    width: 80px !important;
+    height: 80px !important;
+  }
+  
+  .homepage-level {
+    font-size: 22px !important;
+  }
+  
+  .homepage-xp-bar {
+    width: 120px !important;
+  }
+  
+  .homepage-stats {
+    display: flex !important;
+    gap: 32px !important;
+    width: auto !important;
+  }
+  
+  .homepage-stat-label {
+    font-size: 16px !important;
+  }
+  
+  .homepage-stat-bar {
+    height: 8px !important;
+    width: 80px !important;
+  }
+  
+  .homepage-stat-value {
+    font-size: 13px !important;
+  }
+  
+  .homepage-launch-buttons {
+    flex-direction: row !important;
+    justify-content: center !important;
+    gap: 32px !important;
+  }
+  
+  .homepage-launch-btn {
+    font-size: 20px !important;
+    padding: 18px 36px !important;
+  }
+  
+  .homepage-section-heading {
+    font-size: 24px !important;
+  }
+  
+  .homepage-info-btn {
+    width: 20px !important;
+    height: 20px !important;
+    font-size: 16px !important;
+    line-height: 20px !important;
+  }
+  
+  .homepage-info-tooltip {
+    min-width: 220px !important;
+    max-width: 300px !important;
+  }
+  
+  .homepage-curiosities-grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 24px !important;
+    justify-content: center !important;
+  }
+  
+  .homepage-curiosity-card {
+    padding: 24px !important;
+    min-width: 180px !important;
+    max-width: 220px !important;
+  }
+  
+  .homepage-curiosity-title {
+    font-size: 1.1rem !important;
+  }
+  
+  .homepage-curiosity-btn {
+    font-size: 18px !important;
+  }
+  
+  .homepage-curiosity-menu-btn {
+    font-size: 22px !important;
+  }
+  
+  .homepage-modal-content {
+    margin: 24px auto !important;
+  }
+  
+  .homepage-progress-heading {
+    font-size: 24px !important;
+  }
+  
+  .homepage-progress-text {
+    font-size: 1.1rem !important;
+  }
+  
+  .homepage-progress-quote {
+    font-size: 18px !important;
+  }
+}
