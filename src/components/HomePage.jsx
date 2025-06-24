@@ -71,6 +71,9 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [donePulseId, setDonePulseId] = useState(null);
   const [hoveredCardId, setHoveredCardId] = useState(null);
+  const [theme, setTheme] = useState(() => localStorage.getItem('awake_theme') || 'dark');
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem('awake_avatar_url') || '');
 
   // Placeholder values for level and XP
   const level = 3;
@@ -107,6 +110,34 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
     // Save stats to localStorage whenever they change
     localStorage.setItem('awake_stats', JSON.stringify(stats));
   }, [stats]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('awake_theme', theme);
+    // Set CSS variables for dark/light mode
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.style.setProperty('--awake-bg', '#181825');
+      root.style.setProperty('--awake-card', '#232136');
+      root.style.setProperty('--awake-text', '#fff');
+      root.style.setProperty('--awake-text-muted', '#A6ADC8');
+      root.style.setProperty('--awake-accent', '#FFD803');
+      root.style.setProperty('--awake-primary', '#7F5AF0');
+      root.style.setProperty('--awake-shadow', '0 2px 16px 0 #0004');
+      root.style.setProperty('--awake-surface', '#393A4B');
+      root.style.setProperty('--awake-radius', '16px');
+    } else {
+      root.style.setProperty('--awake-bg', '#fff');
+      root.style.setProperty('--awake-card', '#F6F6F6');
+      root.style.setProperty('--awake-text', '#232136');
+      root.style.setProperty('--awake-text-muted', '#6C6F85');
+      root.style.setProperty('--awake-accent', '#7F5AF0');
+      root.style.setProperty('--awake-primary', '#2CB67D');
+      root.style.setProperty('--awake-shadow', '0 2px 16px 0 #7F5AF022');
+      root.style.setProperty('--awake-surface', '#E0DEF4');
+      root.style.setProperty('--awake-radius', '16px');
+    }
+  }, [theme]);
 
   const handleAdd = () => {
     if (newTitle.trim()) {
@@ -190,6 +221,13 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
       const diff = (new Date(today) - new Date(last.toISOString().slice(0, 10))) / (1000 * 60 * 60 * 24);
       if (diff === 1) newStreak = (habit.streak || 0) + 1;
     }
+    // Track best streak
+    const prevBest = habit.bestStreak || habit.streak || 0;
+    let newBest = prevBest;
+    if (newStreak > prevBest) {
+      newBest = newStreak;
+      showCelebration('🍀 Lucky Streak! New personal best: ' + newStreak + ' days!');
+    }
     // Apply buffs
     let newStats = { ...stats };
     habit.buffs.forEach(buff => {
@@ -199,8 +237,8 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
     setStatBuffed(habit.buffs.map(b => b.stat));
     setTimeout(() => setStatBuffed(null), 1200);
     // Update habit in DB and state
-    const updatedHabit = { ...habit, lastCompleted: today, streak: newStreak };
-    await updateHabit(habit.id, { lastCompleted: today, streak: newStreak });
+    const updatedHabit = { ...habit, lastCompleted: today, streak: newStreak, bestStreak: newBest };
+    await updateHabit(habit.id, { lastCompleted: today, streak: newStreak, bestStreak: newBest });
     setHabits(habits => habits.map(h => h.id === habit.id ? updatedHabit : h));
     setHabitDoneToday(h => ({ ...h, [habit.id]: true }));
   };
@@ -217,9 +255,52 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
     }
   };
 
+  const handleSaveAvatarUrl = (url) => {
+    setAvatarUrl(url);
+    localStorage.setItem('awake_avatar_url', url);
+    setShowAvatarModal(false);
+  };
+
   // --- Launchpad Layout ---
   return (
     <div className="homepage-container" style={{ maxWidth: 1100, margin: "0 auto" }}>
+      {/* Sticky Top Header with Settings and Dark Mode */}
+      <nav style={{
+        width: '100%',
+        background: 'var(--awake-card)',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '12px 0 8px 0',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+        boxShadow: '0 2px 8px 0 #0001',
+      }}>
+        {/* Left: Navigation */}
+        <div style={{ display: 'flex', gap: 24, marginLeft: 24 }}>
+          <a href="/" style={{ color: 'var(--awake-text)', textDecoration: 'none', fontWeight: 600, fontSize: 17, padding: '4px 10px', borderRadius: 8, transition: 'background 0.2s' }} className="nav-link">Home</a>
+          <a href="/about" style={{ color: 'var(--awake-text)', textDecoration: 'none', fontWeight: 600, fontSize: 17, padding: '4px 10px', borderRadius: 8, transition: 'background 0.2s' }} className="nav-link">About</a>
+        </div>
+        {/* Right: Settings & Dark Mode */}
+        <div style={{ display: 'flex', gap: 12, marginLeft: 'auto', marginRight: 24 }}>
+          <button
+            className="homepage-curiosity-btn"
+            style={{ fontSize: 15, borderRadius: 16, padding: "6px 18px" }}
+            onClick={() => setShowSettings(true)}
+          >
+            ⚙️ Settings
+          </button>
+          <button
+            className="homepage-curiosity-btn"
+            style={{ fontSize: 15, borderRadius: 16, padding: "6px 18px" }}
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            aria-label="Toggle dark/light mode"
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? '🌞 Light' : '🌙 Dark'}
+          </button>
+        </div>
+      </nav>
       {/* Mission Hero Section */}
       <section className="homepage-mission-hero" style={{ background: "linear-gradient(90deg, #7F5AF0 0%, #2CB67D 100%)", color: "#fff", borderRadius: 16, padding: "32px 24px", marginBottom: 40, boxShadow: "var(--awake-shadow)" }}>
         <h1 style={{ fontSize: "2.2rem", fontWeight: 800, marginBottom: 12 }}>Awake Mission</h1>
@@ -244,8 +325,15 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
       <section className="homepage-top-section" style={{ display: "flex", alignItems: "center", marginBottom: 40, gap: 32 }}>
         {/* Avatar & Level */}
         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-          <div className="homepage-avatar" style={{ background: "var(--awake-surface)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--awake-shadow)" }}>
-            🚀
+          <div style={{ position: 'relative' }}>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--awake-surface)', boxShadow: 'var(--awake-shadow)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                <span style={{ fontSize: 38 }}>🚀</span>
+              )}
+            </div>
+            <button onClick={() => setShowAvatarModal(true)} style={{ position: 'absolute', bottom: -8, right: -8, background: 'var(--awake-primary)', color: '#fff', border: 'none', borderRadius: '50%', width: 32, height: 32, fontSize: 18, boxShadow: '0 2px 8px #0002', cursor: 'pointer' }} title="Customize Avatar">✏️</button>
           </div>
           <div>
             <div className="homepage-level" style={{ fontWeight: 700 }}>Level {level}</div>
@@ -539,8 +627,10 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
                   </div>
                 )}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                  <span style={{ fontSize: 15 }} role="img" aria-label="streak">🔥</span>
-                  <span style={{ fontSize: 13, color: "var(--awake-text-muted)" }}>Streak: {habit.streak || 0}</span>
+                  <span style={{ fontSize: 18 }} role="img" aria-label="lucky streak">🍀</span>
+                  <span style={{ fontSize: 13, color: "var(--awake-text-muted)", fontWeight: 600 }}>
+                    Lucky Streak: {habit.streak || 0} {habit.bestStreak ? `(Best: ${habit.bestStreak})` : ''}
+                  </span>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                   {habit.buffs && habit.buffs.length > 0 ? habit.buffs.map((b, i) => (
@@ -596,15 +686,21 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
         </div>
       )}
 
-      {/* Add Settings button to HomePage header */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <button className="homepage-curiosity-btn" style={{ fontSize: 15, borderRadius: 16, padding: "6px 18px" }} onClick={() => setShowSettings(true)}>
-          ⚙️ Settings
-        </button>
-      </div>
-
       {showSettings && (
         <StatSettingsModal onClose={() => setShowSettings(false)} />
+      )}
+
+      {showAvatarModal && (
+        <div className="modal-backdrop" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.7)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--awake-card)', color: 'var(--awake-text)', borderRadius: 0, padding: 0, width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            <button type="button" onClick={() => setShowAvatarModal(false)} style={{ position: 'absolute', top: 24, right: 32, background: 'none', border: 'none', fontSize: 32, color: 'var(--awake-accent)', cursor: 'pointer', zIndex: 10 }} aria-label="Close">×</button>
+            <h2 style={{ marginTop: 0, marginBottom: 16, color: 'var(--awake-text)' }}>Customize Your Avatar</h2>
+            <iframe src="https://demo.readyplayer.me/avatar" title="ReadyPlayerMe Avatar Creator" style={{ width: '90vw', height: '70vh', border: 'none', borderRadius: 18, marginBottom: 24, background: '#fff' }} allow="camera *; microphone *" />
+            <div style={{ marginBottom: 8, fontSize: 16, color: 'var(--awake-text-muted)' }}>After creating your avatar, copy the avatar URL and paste it below:</div>
+            <input type="text" placeholder="Paste your avatar URL here..." value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} style={{ width: '60vw', maxWidth: 480, padding: 10, borderRadius: 10, border: '1.5px solid #393A4B', marginBottom: 16, background: 'var(--awake-surface)', color: 'var(--awake-text)' }} />
+            <button className="add-goal-btn" style={{ width: 180, fontSize: 17 }} onClick={() => handleSaveAvatarUrl(avatarUrl)}>Save Avatar</button>
+          </div>
+        </div>
       )}
     </div>
   );

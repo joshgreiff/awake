@@ -16,22 +16,12 @@ function App() {
   return (
     <CuriosityProvider>
       <BrowserRouter>
-        <NavBar />
         <Routes>
           <Route path="/" element={<HomePageWrapper />} />
           <Route path="/about" element={<AboutPage />} />
         </Routes>
       </BrowserRouter>
     </CuriosityProvider>
-  );
-}
-
-function NavBar() {
-  return (
-    <nav style={{ display: "flex", gap: 16, padding: 12, borderBottom: "1px solid #eee" }}>
-      <Link to="/">Home</Link>
-      <Link to="/about">About</Link>
-    </nav>
   );
 }
 
