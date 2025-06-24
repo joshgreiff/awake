@@ -227,6 +227,19 @@ const HomePage = ({ onOpenReflection, reflectionData, onAddCuriosity }) => {
           A personalized, evolving, self-development system that helps users become the most aligned version of themselves through accountability, habit-building, community, and intelligent guidance.
         </p>
       </section>
+      {/* After Mission Hero Section, add daily affirmation */}
+      <section className="homepage-affirmation" style={{
+        background: "linear-gradient(90deg, #FFD803 0%, #2CB67D 100%)",
+        color: "#232136",
+        borderRadius: 14,
+        padding: "18px 20px",
+        fontWeight: 700,
+        fontSize: "1.1rem",
+        marginBottom: 24,
+        textAlign: "center"
+      }}>
+        I am the luckiest person in the world. Everything goes my way because I take action toward my dreams.
+      </section>
       {/* Top: Avatar, Level, XP, Stats */}
       <section className="homepage-top-section" style={{ display: "flex", alignItems: "center", marginBottom: 40, gap: 32 }}>
         {/* Avatar & Level */}
