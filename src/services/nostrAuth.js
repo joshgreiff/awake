@@ -1,4 +1,14 @@
-import * as nostrTools from 'nostr-tools';
+// Try alternative import approach
+import { generatePrivateKey, getPublicKey } from 'nostr-tools';
+
+// Create a fallback for nip19 if it's not available
+let nip19;
+try {
+  nip19 = require('nostr-tools/nip19');
+} catch (e) {
+  console.warn('nip19 not available, using hex format only');
+  nip19 = null;
+}
 
 class NostrAuthService {
   constructor() {
@@ -31,8 +41,15 @@ class NostrAuthService {
   // Generate new Nostr identity
   async createIdentity(displayName = 'Awake User') {
     try {
-      this.privateKey = nostrTools.generatePrivateKey();
-      this.publicKey = nostrTools.getPublicKey(this.privateKey);
+      console.log('Creating Nostr identity...');
+      console.log('generatePrivateKey available:', !!generatePrivateKey);
+      console.log('getPublicKey available:', !!getPublicKey);
+      
+      this.privateKey = generatePrivateKey();
+      console.log('Private key generated:', !!this.privateKey);
+      
+      this.publicKey = getPublicKey(this.privateKey);
+      console.log('Public key generated:', !!this.publicKey);
       
       // Create initial user profile
       this.userProfile = {
@@ -41,15 +58,19 @@ class NostrAuthService {
         createdAt: Date.now(),
         version: '1.0.0'
       };
+      console.log('User profile created:', this.userProfile);
 
       // Store securely
       localStorage.setItem('awake_nostr_private_key', this.privateKey);
       localStorage.setItem('awake_user_profile', JSON.stringify(this.userProfile));
+      console.log('Data stored in localStorage');
       
       this.isAuthenticated = true;
+      console.log('Identity creation successful');
       return true;
     } catch (error) {
       console.error('Failed to create Nostr identity:', error);
+      console.error('Error details:', error.message, error.stack);
       return false;
     }
   }
@@ -60,9 +81,9 @@ class NostrAuthService {
       let privateKey;
       
       // Handle different input formats
-      if (privateKeyInput.startsWith('nsec')) {
+      if (privateKeyInput.startsWith('nsec') && nip19) {
         // Bech32 encoded private key
-        const decoded = nostrTools.nip19.decode(privateKeyInput);
+        const decoded = nip19.decode(privateKeyInput);
         privateKey = decoded.data;
       } else if (privateKeyInput.length === 64) {
         // Raw hex private key
@@ -72,7 +93,7 @@ class NostrAuthService {
       }
 
       // Validate the key
-      const publicKey = nostrTools.getPublicKey(privateKey);
+      const publicKey = getPublicKey(privateKey);
       
       this.privateKey = privateKey;
       this.publicKey = publicKey;
@@ -137,7 +158,7 @@ class NostrAuthService {
     
     switch (format) {
       case 'npub':
-        return nostrTools.nip19.npubEncode(this.publicKey);
+        return nip19 ? nip19.npubEncode(this.publicKey) : this.publicKey;
       case 'hex':
       default:
         return this.publicKey;
@@ -150,7 +171,7 @@ class NostrAuthService {
     
     switch (format) {
       case 'nsec':
-        return nostrTools.nip19.nsecEncode(this.privateKey);
+        return nip19 ? nip19.nsecEncode(this.privateKey) : this.privateKey;
       case 'hex':
       default:
         return this.privateKey;
