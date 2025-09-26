@@ -1,11 +1,11 @@
 import React from "react";
-import AwakeCore from "./components/AwakeCore";
+import AwakeDashboard from "./components/AwakeDashboard";
 import "./App.css";
 
 function App() {
   return (
     <div className="App">
-      <AwakeCore />
+      <AwakeDashboard />
     </div>
   );
 }
