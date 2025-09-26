@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import aiService from '../services/aiService';
+import nostrAuth from '../services/nostrAuth';
+import awakeDB from '../storage/awakeDB';
+import NostrAuthModal from './NostrAuthModal';
 import './AwakeCore.css';
 
 const AwakeCore = () => {
-  const [curiosities, setCuriosities] = useState([
-    { id: 1, text: "Pokemon TCG competing", inspiration: 70 },
-    { id: 2, text: "AnyLingo app creation", inspiration: 85 },
-    { id: 3, text: "Wander Studios building/administration", inspiration: 60 },
-    { id: 4, text: "Bitcoin education/advocacy", inspiration: 75 }
-  ]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [userId, setUserId] = useState(null);
+  const [userInfo, setUserInfo] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [curiosities, setCuriosities] = useState([]);
   
   // Enhanced attributes system based on Aurora's design
   const [attributes, setAttributes] = useState([
@@ -42,8 +46,37 @@ const AwakeCore = () => {
   const [showCelebration, setShowCelebration] = useState(false);
   const [apiKey, setApiKey] = useState(localStorage.getItem('claude_api_key') || '');
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [showPlaybook, setShowPlaybook] = useState(true);
+
+  // Initialize authentication and load user data
+  useEffect(() => {
+    const initializeApp = async () => {
+      setIsLoading(true);
+      
+      // Initialize Nostr authentication
+      const authSuccess = await nostrAuth.initialize();
+      
+      if (authSuccess) {
+        const userInfo = nostrAuth.getUserInfo();
+        setIsAuthenticated(true);
+        setUserId(userInfo.publicKey);
+        setUserInfo(userInfo);
+        
+        // Initialize database for this user
+        await awakeDB.initializeUser(userInfo.publicKey, userInfo);
+        
+        // Load user data
+        await loadUserData(userInfo.publicKey);
+      } else {
+        // Show auth modal for new users
+        setShowAuthModal(true);
+      }
+      
+      setIsLoading(false);
+    };
+
+    initializeApp();
+  }, []);
 
   // Initialize AI service when API key is available
   useEffect(() => {
@@ -53,10 +86,99 @@ const AwakeCore = () => {
     }
   }, [apiKey]);
 
+  // Load user data from IndexedDB
+  const loadUserData = async (userId) => {
+    try {
+      const [
+        loadedCuriosities,
+        loadedAttributes, 
+        loadedNeeds
+      ] = await Promise.all([
+        awakeDB.getCuriosities(userId),
+        awakeDB.getAttributes(userId),
+        awakeDB.getNeeds(userId)
+      ]);
+
+      // Set loaded data or use defaults
+      if (loadedCuriosities.length > 0) {
+        setCuriosities(loadedCuriosities);
+      } else {
+        // Initialize with default curiosities for new users
+        const defaultCuriosities = [
+          { title: "Pokemon TCG competing", inspiration: 70 },
+          { title: "AnyLingo app creation", inspiration: 85 },
+          { title: "Wander Studios building/administration", inspiration: 60 },
+          { title: "Bitcoin education/advocacy", inspiration: 75 }
+        ];
+        
+        for (const curiosity of defaultCuriosities) {
+          await awakeDB.addCuriosity(curiosity, userId);
+        }
+        setCuriosities(await awakeDB.getCuriosities(userId));
+      }
+
+      if (loadedAttributes.length > 0) {
+        setAttributes(loadedAttributes);
+      } else {
+        // Initialize with default attributes
+        const defaultAttributes = [
+          { name: "Creativity", score: 7.8, maxScore: 10, description: "Innovation and artistic expression" },
+          { name: "Discipline", score: 6.1, maxScore: 10, description: "Self-control and consistency" },
+          { name: "Communication", score: 8.5, maxScore: 10, description: "Expression and connection with others" },
+          { name: "Emotional Regulation", score: 6.4, maxScore: 10, description: "Managing emotions effectively" },
+          { name: "Social Connection", score: 5.7, maxScore: 10, description: "Building meaningful relationships" },
+          { name: "Focus", score: 7.2, maxScore: 10, description: "Sustained attention and concentration" },
+          { name: "Energy", score: 6.5, maxScore: 10, description: "Physical and mental vitality" }
+        ];
+        
+        for (const attribute of defaultAttributes) {
+          await awakeDB.addAttribute(attribute, userId);
+        }
+        setAttributes(await awakeDB.getAttributes(userId));
+      }
+
+      if (loadedNeeds.length > 0) {
+        setNeeds(loadedNeeds);
+      } else {
+        // Initialize with default needs
+        const defaultNeeds = [
+          { name: "Energy", value: 65, color: "#FF6B6B" },
+          { name: "Focus", value: 72, color: "#4ECDC4" },
+          { name: "Joy", value: 55, color: "#FFE66D" },
+          { name: "Connection", value: 40, color: "#A8E6CF" },
+          { name: "Health", value: 70, color: "#FF8B94" }
+        ];
+        
+        for (const need of defaultNeeds) {
+          await awakeDB.addNeed(need, userId);
+        }
+        setNeeds(await awakeDB.getNeeds(userId));
+      }
+
+    } catch (error) {
+      console.error('Failed to load user data:', error);
+    }
+  };
+
+  // Handle successful authentication
+  const handleAuthSuccess = async () => {
+    const userInfo = nostrAuth.getUserInfo();
+    setIsAuthenticated(true);
+    setUserId(userInfo.publicKey);
+    setUserInfo(userInfo);
+    setShowAuthModal(false);
+    
+    // Initialize database and load data
+    await awakeDB.initializeUser(userInfo.publicKey, userInfo);
+    await loadUserData(userInfo.publicKey);
+  };
+
   // Generate daily playbook on component mount and when state changes
   useEffect(() => {
-    generateDailyPlaybook();
-  }, [curiosities, attributes, needs]);
+    if (isAuthenticated && curiosities.length > 0) {
+      generateDailyPlaybook();
+    }
+  }, [curiosities, attributes, needs, isAuthenticated]);
 
   const generateDailyPlaybook = () => {
     const playbook = [];
@@ -117,16 +239,26 @@ const AwakeCore = () => {
     setDailyPlaybook(playbook.sort((a, b) => b.priority - a.priority).slice(0, 5));
   };
 
-  const updateNeed = (id, value) => {
-    setNeeds(needs.map(need => 
+  const updateNeed = async (id, value) => {
+    const updatedNeeds = needs.map(need => 
       need.id === id ? { ...need, value: parseInt(value) } : need
-    ));
+    );
+    setNeeds(updatedNeeds);
+    
+    if (userId) {
+      await awakeDB.updateNeed(id, { value: parseInt(value) }, userId);
+    }
   };
 
-  const updateAttributeScore = (id, score) => {
-    setAttributes(attributes.map(attr => 
+  const updateAttributeScore = async (id, score) => {
+    const updatedAttributes = attributes.map(attr => 
       attr.id === id ? { ...attr, score: parseFloat(score) } : attr
-    ));
+    );
+    setAttributes(updatedAttributes);
+    
+    if (userId) {
+      await awakeDB.updateAttribute(id, { score: parseFloat(score) }, userId);
+    }
   };
 
   const addCuriosity = () => {
@@ -304,15 +436,66 @@ const AwakeCore = () => {
     return '#FF4757';
   };
 
+  // Show loading screen during initialization
+  if (isLoading) {
+    return (
+      <div className="awake-core loading-screen">
+        <div className="loading-content">
+          <div className="loading-spinner">🚀</div>
+          <h2>Initializing Awake...</h2>
+          <p>Setting up your decentralized personal development system</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show authentication modal if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="awake-core">
+        {showAuthModal && (
+          <NostrAuthModal
+            onAuthSuccess={handleAuthSuccess}
+            onClose={() => setShowAuthModal(false)}
+          />
+        )}
+        <div className="welcome-screen">
+          <h1>🌟 Welcome to Awake</h1>
+          <p>Your decentralized personal development companion</p>
+          <button 
+            className="auth-btn primary"
+            onClick={() => setShowAuthModal(true)}
+          >
+            Get Started
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="awake-core">
-      {/* API Key Setup */}
-      {!apiKey && (
-        <div className="api-key-banner">
-          <span>🤖 Add your Claude API key to unlock intelligent coaching!</span>
-          <button onClick={() => setShowApiKeyModal(true)}>Setup AI</button>
+      {/* User Identity Banner */}
+      <div className="user-identity-banner">
+        <div className="user-info">
+          <span className="user-icon">🔐</span>
+          <div>
+            <div className="user-name">{userInfo?.displayName}</div>
+            <div className="user-id">{userInfo?.displayId}</div>
+          </div>
         </div>
-      )}
+        <div className="identity-actions">
+          {!apiKey && (
+            <button 
+              className="setup-ai-btn"
+              onClick={() => setShowApiKeyModal(true)}
+            >
+              🤖 Setup AI
+            </button>
+          )}
+          <button className="settings-btn" onClick={() => setShowApiKeyModal(true)}>⚙️</button>
+        </div>
+      </div>
 
       {/* Character Status */}
       <div className="character-status">
@@ -595,6 +778,14 @@ const AwakeCore = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Authentication Modal */}
+      {showAuthModal && (
+        <NostrAuthModal
+          onAuthSuccess={handleAuthSuccess}
+          onClose={() => setShowAuthModal(false)}
+        />
       )}
     </div>
   );
