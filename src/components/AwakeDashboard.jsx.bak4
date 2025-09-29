@@ -53,10 +53,10 @@ const AwakeDashboard = () => {
     const initializeAuth = async () => {
       const { userId } = await nostrAuth.initialize();
       setUserId(userId);
-      setCurrentUserId(userId || 'local');
       
-      // Always load data, even if no userId
-      await loadUserData(userId || 'local');
+      if (userId) {
+        await loadUserData(userId);
+      }
     };
     
     initializeAuth();
@@ -157,10 +157,10 @@ const AwakeDashboard = () => {
           { id: 4, text: "Bitcoin education/advocacy", inspiration: 75 }
         ],
         attributes: [
-          createTrait('Creativity', 0),
-          createTrait('Discipline', 0),
-          createTrait('Communication', 0),
-          createTrait('Focus', 0)
+          createTrait('Creativity', 300),
+          createTrait('Discipline', 150),
+          createTrait('Communication', 400),
+          createTrait('Focus', 250)
         ],
         needs: [
           { id: 1, name: "Energy", value: 65, color: "#FF6B6B" },
@@ -321,6 +321,31 @@ const AwakeDashboard = () => {
   // Daily Reflection handlers
   const startDailyReflection = () => {
     setShowReflection(true);
+  };
+
+  const startVisionCreation = () => {
+    setShowVisionCreation(true);
+  };
+
+  const handleVisionComplete = (visionResult) => {
+    setShowVisionCreation(false);
+    
+    if (!visionResult.cancelled) {
+      // Save the compiled vision
+      const finalVision = visionResult.compiledVision || visionResult.identity || '';
+      setVision(finalVision);
+      
+      // Save full vision data to localStorage for future reference
+      localStorage.setItem('awake-full-vision', JSON.stringify(visionResult));
+      
+      // Update user data
+      saveUserData({ curiosities, attributes, needs, vision: finalVision });
+      
+      // Show celebration message
+      setChatMessages([
+        { sender: 'LOA', text: "🎉 Your vision is alive! You can view it anytime in the Vision card below, or click to refine it. Your daily reflections and actions will now align with this powerful vision!" }
+      ]);
+    }
   };
 
   const handleReflectionComplete = async (reflectionSummary) => {
@@ -502,7 +527,7 @@ const AwakeDashboard = () => {
       const finalVision = visionResult.compiledVision || visionResult.identity || '';
       setVision(finalVision);
       
-      // Save full vision data to localStorage
+      // Save full vision data to localStorage for future reference
       localStorage.setItem('awake-full-vision', JSON.stringify(visionResult));
       
       // Update user data
@@ -510,7 +535,7 @@ const AwakeDashboard = () => {
       
       // Show celebration message
       setChatMessages([
-        { sender: 'LOA', text: "🎉 Your vision is alive! You can edit it anytime or listen to it daily to reinforce your path. Your curiosities and daily actions will now align with this powerful vision!" }
+        { sender: 'LOA', text: "🎉 Your vision is alive! You can view it anytime in the Vision card below, or click to refine it. Your daily reflections and actions will now align with this powerful vision!" }
       ]);
     }
   };
@@ -559,7 +584,7 @@ const AwakeDashboard = () => {
           <div className="card-header">
             <h3>Your Vision</h3>
             <button className="edit-btn" onClick={startEditingVision} title="Edit Vision">✏️</button>
-            <button className="create-vision-btn" onClick={startVisionCreation} title="Create Vision">🔮 Create Vision</button>
+            <button className="create-vision-btn" onClick={startVisionCreation} title="Create Vision">��</button>
           </div>
           
           {isEditingVision ? (

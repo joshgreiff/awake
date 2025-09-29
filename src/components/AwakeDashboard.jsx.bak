@@ -41,8 +41,8 @@ const AwakeDashboard = () => {
 
   // Daily Reflection state
   const [showReflection, setShowReflection] = useState(false);
-  const [showVisionCreation, setShowVisionCreation] = useState(false);
   const [reflectionHistory, setReflectionHistory] = useState([]);
+  const [showVisionCreation, setShowVisionCreation] = useState(false);
 
   // Character progress
   const [character, setCharacter] = useState({ level: 1, xp: 0, xpToNext: 100 });
@@ -53,10 +53,10 @@ const AwakeDashboard = () => {
     const initializeAuth = async () => {
       const { userId } = await nostrAuth.initialize();
       setUserId(userId);
-      setCurrentUserId(userId || 'local');
       
-      // Always load data, even if no userId
-      await loadUserData(userId || 'local');
+      if (userId) {
+        await loadUserData(userId);
+      }
     };
     
     initializeAuth();
@@ -157,10 +157,10 @@ const AwakeDashboard = () => {
           { id: 4, text: "Bitcoin education/advocacy", inspiration: 75 }
         ],
         attributes: [
-          createTrait('Creativity', 0),
-          createTrait('Discipline', 0),
-          createTrait('Communication', 0),
-          createTrait('Focus', 0)
+          createTrait('Creativity', 300),
+          createTrait('Discipline', 150),
+          createTrait('Communication', 400),
+          createTrait('Focus', 250)
         ],
         needs: [
           { id: 1, name: "Energy", value: 65, color: "#FF6B6B" },
@@ -559,7 +559,7 @@ const AwakeDashboard = () => {
           <div className="card-header">
             <h3>Your Vision</h3>
             <button className="edit-btn" onClick={startEditingVision} title="Edit Vision">✏️</button>
-            <button className="create-vision-btn" onClick={startVisionCreation} title="Create Vision">🔮 Create Vision</button>
+            <button className="create-vision-btn" onClick={startVisionCreation} title="Create Vision">��</button>
           </div>
           
           {isEditingVision ? (

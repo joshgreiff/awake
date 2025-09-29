@@ -157,10 +157,10 @@ const AwakeDashboard = () => {
           { id: 4, text: "Bitcoin education/advocacy", inspiration: 75 }
         ],
         attributes: [
-          createTrait('Creativity', 0),
-          createTrait('Discipline', 0),
-          createTrait('Communication', 0),
-          createTrait('Focus', 0)
+          createTrait('Creativity', 300),
+          createTrait('Discipline', 150),
+          createTrait('Communication', 400),
+          createTrait('Focus', 250)
         ],
         needs: [
           { id: 1, name: "Energy", value: 65, color: "#FF6B6B" },
