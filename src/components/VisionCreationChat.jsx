@@ -23,7 +23,7 @@ const VisionCreationChat = ({ onComplete, userContext, apiKey }) => {
     {
       id: 'welcome',
       title: 'Welcome to Your Vision',
-      prompt: "Hey! I'm excited to help you create your Master Vision. This is your chance to design the life you want to live - with no limitations. We'll go through 9 steps together to craft a powerful vision of your future self. Ready to begin?"
+      prompt: "Hey! I'm excited to help you create your Vision. This is your chance to design the life you want to live - with no limitations. We'll go through 9 steps together to craft a powerful vision of your future self. Ready to begin?"
     },
     {
       id: 'materialDesires',
