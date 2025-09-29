@@ -283,8 +283,14 @@
 
 .vision-input-row {
   display: flex;
+  flex-direction: column;
   gap: 12px;
-  align-items: flex-end;
+}
+
+.vision-button-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 .vision-input-row textarea {
@@ -309,7 +315,8 @@
   color: #999;
 }
 
-.vision-send-btn {
+.vision-send-btn,
+.vision-save-btn {
   padding: 14px 24px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -320,14 +327,25 @@
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  flex: 1;
 }
 
-.vision-send-btn:hover:not(:disabled) {
+.vision-save-btn {
+  background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+}
+
+.vision-send-btn:hover:not(:disabled),
+.vision-save-btn:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
-.vision-send-btn:disabled {
+.vision-save-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4);
+}
+
+.vision-send-btn:disabled,
+.vision-save-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
