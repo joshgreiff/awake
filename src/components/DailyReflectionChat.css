@@ -197,6 +197,12 @@
   border-top: 1px solid #e1e5e9;
   background: #fafafa;
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.input-row {
+  display: flex;
   gap: 12px;
 }
 

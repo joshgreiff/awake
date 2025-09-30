@@ -138,25 +138,24 @@ const DailyReflectionChat = ({ onComplete, userContext, apiKey }) => {
           </div>
 
           <div className="reflection-input">
-            {!reflectionComplete ? (
-              <>
-                <input
-                  type="text"
-                  value={currentMessage}
-                  onChange={(e) => setCurrentMessage(e.target.value)}
-                  placeholder="Share your thoughts..."
-                  onKeyPress={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
-                  disabled={isLoading}
-                />
-                <button 
-                  onClick={() => sendMessage()} 
-                  disabled={isLoading || !currentMessage.trim()}
-                  className="send-btn"
-                >
-                  Send
-                </button>
-              </>
-            ) : (
+            <div className="input-row">
+              <input
+                type="text"
+                value={currentMessage}
+                onChange={(e) => setCurrentMessage(e.target.value)}
+                placeholder="Share your thoughts..."
+                onKeyPress={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
+                disabled={isLoading}
+              />
+              <button 
+                onClick={() => sendMessage()} 
+                disabled={isLoading || !currentMessage.trim()}
+                className="send-btn"
+              >
+                Send
+              </button>
+            </div>
+            {reflectionComplete && (
               <button 
                 onClick={completeReflection}
                 className="complete-reflection-btn"

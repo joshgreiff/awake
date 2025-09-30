@@ -154,6 +154,7 @@ const AwakeDashboard = () => {
       setNeeds(data.needs || []);
       setVision(data.vision || '');
       setProfile(data.profile || { name: '', gender: 'other' });
+      setDailyPlaybook(data.dailyPlaybook || []);
     } else {
       // Initialize with defaults
       const defaultData = {
@@ -194,7 +195,8 @@ const AwakeDashboard = () => {
       attributes,
       needs,
       vision,
-      profile
+      profile,
+      dailyPlaybook
     }));
   };
 
@@ -385,6 +387,9 @@ const AwakeDashboard = () => {
           
           if (aiPlaybook && aiPlaybook.length > 0) {
             setDailyPlaybook(aiPlaybook);
+            
+            // Save playbook to localStorage
+            saveUserData({ curiosities, attributes, needs, vision, profile, dailyPlaybook: aiPlaybook });
             
             // Show success message
             setChatMessages([
@@ -801,6 +806,39 @@ const AwakeDashboard = () => {
         {/* LOA Chat */}
         <div className="dashboard-card chat-card">
           <h3>Chat with LOA</h3>
+          
+          {chatMessages.length === 0 && (
+            <div className="chat-prompts">
+              <p className="prompts-label">Deep Dive Prompts:</p>
+              <div className="prompt-buttons">
+                <button 
+                  className="prompt-btn"
+                  onClick={() => sendMessage("Help me explore what I truly want in life. Ask me deep questions about my desires and aspirations.")}
+                >
+                  🎯 Explore Your Desires
+                </button>
+                <button 
+                  className="prompt-btn"
+                  onClick={() => sendMessage("I want to understand my motivations better. Help me dig into why I'm pursuing my current goals.")}
+                >
+                  💭 Understand Your Why
+                </button>
+                <button 
+                  className="prompt-btn"
+                  onClick={() => sendMessage("Help me identify what's holding me back from becoming who I want to be.")}
+                >
+                  🔍 Find Your Blocks
+                </button>
+                <button 
+                  className="prompt-btn"
+                  onClick={() => sendMessage("Let's explore how my daily actions connect to my bigger vision.")}
+                >
+                  🔗 Connect Actions to Vision
+                </button>
+              </div>
+            </div>
+          )}
+          
           <div className="chat-messages">
             {chatMessages.map((msg, index) => (
               <div key={index} className={`message ${msg.sender.toLowerCase()}`}>
@@ -858,9 +896,11 @@ const AwakeDashboard = () => {
               </div>
             ))}
           </div>
-          <button className="refresh-playbook-btn" onClick={generateDailyPlaybook}>
-            🔄 Refresh Playbook
-          </button>
+          {dailyPlaybook.length === 0 && (
+            <div className="empty-playbook">
+              <p>📝 Complete your Daily Reflection to generate your playbook</p>
+            </div>
+          )}
         </div>
 
         {/* Progress Insights */}
