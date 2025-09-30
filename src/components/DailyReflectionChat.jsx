@@ -11,6 +11,11 @@ const DailyReflectionChat = ({ onComplete, userContext, apiKey }) => {
 
   // Start the reflection with LOA's first message
   useEffect(() => {
+    // Initialize AI service with API key
+    if (apiKey) {
+      aiService.initialize(apiKey);
+    }
+    
     const startReflection = async () => {
       const welcomeMessage = {
         sender: 'LOA',
@@ -20,7 +25,7 @@ const DailyReflectionChat = ({ onComplete, userContext, apiKey }) => {
     };
     
     startReflection();
-  }, []);
+  }, [apiKey]);
 
   const sendMessage = async (messageText = currentMessage) => {
     if (!messageText.trim()) return;

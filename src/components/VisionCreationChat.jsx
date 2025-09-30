@@ -8,13 +8,18 @@ const VisionCreationChat = ({ onComplete, userContext, apiKey }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    // Initialize AI service with API key
+    if (apiKey) {
+      aiService.initialize(apiKey);
+    }
+    
     // Start with welcome message
     const welcomeMessage = {
       sender: 'LOA',
       text: "Hey! I'm excited to help you create your Vision. This is your chance to design the life you want to live - with no limitations. Let's explore what matters most to you - your goals, dreams, the person you're becoming. Ready to begin?"
     };
     setMessages([welcomeMessage]);
-  }, []);
+  }, [apiKey]);
 
   const sendMessage = async (messageText = currentMessage) => {
     if (!messageText.trim()) return;

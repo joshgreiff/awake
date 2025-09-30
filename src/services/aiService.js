@@ -44,7 +44,7 @@ USER'S CURRENT STATE:
 ${vision ? `Vision: "${vision}"` : ""}
 Curiosities: ${curiosities.map(c => `"${c.text}" (Inspiration: ${c.inspiration}%)`).join(', ')}
 
-Attributes: ${attributes.map(a => `${a.name} (${a.score.toFixed(1)}/${a.maxScore})`).join(', ')}
+Attributes: ${attributes.map(a => `${a.name} (Level ${a.level || 0})`).join(', ')}
 
 Current Needs: ${needs.map(n => `${n.name} (${n.value}%)`).join(', ')}
 
@@ -215,7 +215,7 @@ ${vision ? `USER'S VISION: "${vision}"
 CURRENT STATE:
 Curiosities: ${curiosities.map(c => `"${c.text}" (${c.inspiration}%)`).join(', ')}
 Needs: ${needs.map(n => `${n.name} (${n.value}%)`).join(', ')}
-Traits: ${attributes.map(a => `${a.name} (${a.score.toFixed(1)}/10)`).join(', ')}
+Traits: ${attributes.map(a => `${a.name} (Level ${a.level || 0})`).join(', ')}
 
 CONVERSATION STYLE:
 - Be warm, curious, and insightful
@@ -252,7 +252,7 @@ ${vision ? `USER'S VISION: "${vision}"
 ` : ''}CURRENT STATE:
 Curiosities: ${curiosities.map(c => `"${c.text}" (${c.inspiration}%)`).join(', ')}
 Needs: ${needs.map(n => `${n.name} (${n.value}%)`).join(', ')}
-Traits: ${attributes.map(a => `${a.name} (${a.score.toFixed(1)}/10)`).join(', ')}
+Traits: ${attributes.map(a => `${a.name} (Level ${a.level || 0})`).join(', ')}
 
 TASK REQUIREMENTS:
 - Each task must be SPECIFIC and ACTIONABLE (not vague like "work on project")
