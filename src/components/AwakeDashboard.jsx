@@ -6,7 +6,7 @@ import NostrAuthModal from './NostrAuthModal';
 import DailyReflectionChat from './DailyReflectionChat';
 import VisionCreationChat from './VisionCreationChat';
 import ProgressInsights from './ProgressInsights';
-import { addTraitXP, createTrait, getTraitScore, getTraitColor } from '../utils/traitSystem';
+import { addTraitXP, createTrait, getTraitScore, getTraitColor, TRAIT_SUGGESTIONS } from '../utils/traitSystem';
 import { saveDailySnapshot } from '../utils/dataTracking';
 import './AwakeDashboard.css';
 
@@ -25,10 +25,12 @@ const AwakeDashboard = () => {
   const [dailyPlaybook, setDailyPlaybook] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [vision, setVision] = useState('');
+  const [profile, setProfile] = useState({ name: '', gender: 'other' });
 
   // UI state
   const [apiKey, setApiKey] = useState(localStorage.getItem('claude_api_key') || '');
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -43,6 +45,10 @@ const AwakeDashboard = () => {
   const [showReflection, setShowReflection] = useState(false);
   const [showVisionCreation, setShowVisionCreation] = useState(false);
   const [reflectionHistory, setReflectionHistory] = useState([]);
+
+  // Trait customization state
+  const [showTraitModal, setShowTraitModal] = useState(false);
+  const [customTraitName, setCustomTraitName] = useState('');
 
   // Character progress
   const [character, setCharacter] = useState({ level: 1, xp: 0, xpToNext: 100 });
@@ -147,6 +153,7 @@ const AwakeDashboard = () => {
       setAttributes(data.attributes || []);
       setNeeds(data.needs || []);
       setVision(data.vision || '');
+      setProfile(data.profile || { name: '', gender: 'other' });
     } else {
       // Initialize with defaults
       const defaultData = {
@@ -160,7 +167,7 @@ const AwakeDashboard = () => {
           createTrait('Creativity', 0),
           createTrait('Discipline', 0),
           createTrait('Communication', 0),
-          createTrait('Focus', 0)
+          createTrait('Consistency', 0)
         ],
         needs: [
           { id: 1, name: "Energy", value: 65, color: "#FF6B6B" },
@@ -168,13 +175,15 @@ const AwakeDashboard = () => {
           { id: 3, name: "Joy", value: 55, color: "#FFE66D" },
           { id: 4, name: "Connection", value: 40, color: "#A8E6CF" }
         ],
-        vision: ""
+        vision: "",
+        profile: { name: '', gender: 'other' }
       };
       
       setCuriosities(defaultData.curiosities);
       setAttributes(defaultData.attributes);
       setNeeds(defaultData.needs);
       setVision(defaultData.vision);
+      setProfile(defaultData.profile);
       saveUserData(defaultData);
     }
   };
@@ -184,7 +193,8 @@ const AwakeDashboard = () => {
       curiosities,
       attributes,
       needs,
-      vision
+      vision,
+      profile
     }));
   };
 
@@ -297,6 +307,30 @@ const AwakeDashboard = () => {
     }
   };
 
+  // Trait Management
+  const addTrait = (traitName) => {
+    // Check if trait already exists
+    if (attributes.some(attr => attr.name === traitName)) {
+      alert('You already have this trait!');
+      return;
+    }
+    
+    const newTrait = createTrait(traitName, 0);
+    const updatedAttributes = [...attributes, newTrait];
+    setAttributes(updatedAttributes);
+    saveUserData({ curiosities, attributes: updatedAttributes, needs, vision });
+    setShowTraitModal(false);
+    setCustomTraitName('');
+  };
+
+  const removeTrait = (traitName) => {
+    if (window.confirm(`Remove ${traitName} from your traits?`)) {
+      const updatedAttributes = attributes.filter(attr => attr.name !== traitName);
+      setAttributes(updatedAttributes);
+      saveUserData({ curiosities, attributes: updatedAttributes, needs, vision });
+    }
+  };
+
   const cancelEditingCuriosity = () => {
     setEditingCuriosity(null);
   };
@@ -402,7 +436,7 @@ const AwakeDashboard = () => {
     setIsChatLoading(true);
 
     try {
-      const userContext = { curiosities, attributes, needs, dailyPlaybook, vision };
+      const userContext = { curiosities, attributes, needs, dailyPlaybook, vision, profile };
 
       let aiResponse;
       if (!apiKey) {
@@ -532,12 +566,24 @@ const AwakeDashboard = () => {
       <div className="dashboard-header">
         <div className="user-section">
           <h1>Awake Dashboard</h1>
-          <p>User: {userInfo?.displayName} | Level: {character.level} | Tokens: {Math.floor(character.xp / 10)}</p>
+          <p>
+            {profile.name || 'User'} | Level: {character.level} | Tokens: {Math.floor(character.xp / 10)}
+            {!profile.name && (
+              <button className="set-profile-btn" onClick={() => setShowProfileModal(true)}>
+                Set Profile
+              </button>
+            )}
+          </p>
         </div>
         <div className="header-actions">
           <button className="reflection-btn" onClick={startDailyReflection}>
             📝 Daily Reflection
           </button>
+          {profile.name && (
+            <button className="profile-btn" onClick={() => setShowProfileModal(true)} title="Edit Profile">
+              👤
+            </button>
+          )}
           {!apiKey && (
             <button className="setup-ai-btn" onClick={() => setShowApiKeyModal(true)}>
               🤖 Setup AI
@@ -623,7 +669,10 @@ const AwakeDashboard = () => {
 
         {/* Attributes */}
         <div className="dashboard-card attributes-card">
-          <h3>Traits & Levels</h3>
+          <div className="card-header">
+            <h3>Traits & Levels</h3>
+            <button className="add-btn" onClick={() => setShowTraitModal(true)} title="Customize Traits">⚙️</button>
+          </div>
           <p className="traits-subtitle">Level up by completing daily actions</p>
           <div className="attributes-list">
             {attributes.map(attr => (
@@ -632,9 +681,18 @@ const AwakeDashboard = () => {
                   <span className="trait-name" style={{ color: getTraitColor(attr.name) }}>
                     {attr.name}
                   </span>
-                  <span className="attribute-level">
-                    Level {attr.level || 0} <span className="attribute-score">({getTraitScore(attr.level || 0).toFixed(1)}/10)</span>
-                  </span>
+                  <div className="trait-actions">
+                    <span className="attribute-level">
+                      Level {attr.level || 0} <span className="attribute-score">({getTraitScore(attr.level || 0).toFixed(1)}/10)</span>
+                    </span>
+                    <button 
+                      className="remove-trait-btn" 
+                      onClick={() => removeTrait(attr.name)}
+                      title="Remove trait"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
                 <div className="attribute-bar">
                   <div 
@@ -838,7 +896,7 @@ const AwakeDashboard = () => {
       {showReflection && (
         <DailyReflectionChat
           onComplete={handleReflectionComplete}
-          userContext={{ curiosities, attributes, needs, vision }}
+          userContext={{ curiosities, attributes, needs, vision, profile }}
           apiKey={apiKey}
         />
       )}
@@ -847,9 +905,146 @@ const AwakeDashboard = () => {
       {showVisionCreation && (
         <VisionCreationChat
           onComplete={handleVisionComplete}
-          userContext={{ curiosities, attributes, needs, vision }}
+          userContext={{ curiosities, attributes, needs, vision, profile }}
           apiKey={apiKey}
         />
+      )}
+
+      {/* Trait Customization Modal */}
+      {showTraitModal && (
+        <div className="modal-overlay" onClick={() => setShowTraitModal(false)}>
+          <div className="modal-content trait-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Customize Your Traits</h2>
+              <button className="close-btn" onClick={() => setShowTraitModal(false)}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <p className="modal-description">
+                Choose traits that matter to you. These represent the areas where you want to grow and level up.
+              </p>
+
+              <div className="trait-suggestions">
+                <h3>Suggested Traits</h3>
+                <div className="trait-grid">
+                  {TRAIT_SUGGESTIONS.map(trait => {
+                    const isActive = attributes.some(attr => attr.name === trait.name);
+                    return (
+                      <button
+                        key={trait.name}
+                        className={`trait-suggestion-btn ${isActive ? 'active' : ''}`}
+                        onClick={() => isActive ? removeTrait(trait.name) : addTrait(trait.name)}
+                        title={trait.description}
+                      >
+                        {trait.name} {isActive && '✓'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="custom-trait-section">
+                <h3>Add Custom Trait</h3>
+                <div className="custom-trait-input">
+                  <input
+                    type="text"
+                    placeholder="Enter trait name..."
+                    value={customTraitName}
+                    onChange={(e) => setCustomTraitName(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && customTraitName.trim()) {
+                        addTrait(customTraitName.trim());
+                      }
+                    }}
+                  />
+                  <button 
+                    onClick={() => customTraitName.trim() && addTrait(customTraitName.trim())}
+                    disabled={!customTraitName.trim()}
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              <div className="current-traits">
+                <h3>Your Current Traits ({attributes.length})</h3>
+                <div className="current-trait-list">
+                  {attributes.map(attr => (
+                    <div key={attr.id} className="current-trait-item">
+                      <span style={{ color: getTraitColor(attr.name) }}>{attr.name}</span>
+                      <button onClick={() => removeTrait(attr.name)}>Remove</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button className="primary-btn" onClick={() => setShowTraitModal(false)}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <div className="modal-overlay" onClick={() => setShowProfileModal(false)}>
+          <div className="modal-content profile-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Your Profile</h2>
+              <button className="close-btn" onClick={() => setShowProfileModal(false)}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <p className="modal-description">
+                Set your name and gender so LOA can personalize your vision and conversations.
+              </p>
+
+              <div className="profile-form">
+                <div className="form-group">
+                  <label>Name</label>
+                  <input
+                    type="text"
+                    placeholder="Enter your name..."
+                    value={profile.name}
+                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Gender</label>
+                  <div className="gender-options">
+                    {[
+                      { value: 'male', label: 'Male' },
+                      { value: 'female', label: 'Female' },
+                      { value: 'other', label: 'Other' }
+                    ].map(g => (
+                      <button
+                        key={g.value}
+                        className={`gender-btn ${profile.gender === g.value ? 'active' : ''}`}
+                        onClick={() => setProfile({ ...profile, gender: g.value })}
+                      >
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button 
+                className="primary-btn" 
+                onClick={() => {
+                  saveUserData({ curiosities, attributes, needs, vision, profile });
+                  setShowProfileModal(false);
+                }}
+              >
+                Save Profile
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

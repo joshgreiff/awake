@@ -758,6 +758,7 @@
   border-radius: 12px;
   max-width: 500px;
   width: 90vw;
+  box-sizing: border-box;
 }
 
 .modal-content h3 {
@@ -773,6 +774,7 @@
   margin: 15px 0;
   color: #333;
   background: #fff;
+  box-sizing: border-box;
 }
 
 .modal-actions {
@@ -931,4 +933,309 @@
 
 .cancel-btn:hover {
   background: #e8eaed;
+}
+
+/* Trait Customization */
+.trait-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.remove-trait-btn {
+  background: transparent;
+  border: none;
+  color: #999;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 5px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.remove-trait-btn:hover {
+  color: #ff4444;
+}
+
+/* Trait Modal */
+.trait-modal {
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-description {
+  color: #666;
+  margin-bottom: 25px;
+  line-height: 1.5;
+}
+
+.trait-suggestions {
+  margin-bottom: 30px;
+}
+
+.trait-suggestions h3 {
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.trait-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.trait-suggestion-btn {
+  padding: 10px 15px;
+  border: 2px solid #e0e0e0;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.trait-suggestion-btn:hover {
+  border-color: #7F5AF0;
+  background: #f8f4ff;
+  transform: translateY(-2px);
+}
+
+.trait-suggestion-btn.active {
+  border-color: #7F5AF0;
+  background: linear-gradient(135deg, #7F5AF0 0%, #6B4CE0 100%);
+  color: white;
+  font-weight: 600;
+}
+
+.custom-trait-section {
+  margin-bottom: 30px;
+  padding-top: 30px;
+  border-top: 2px solid #f0f0f0;
+}
+
+.custom-trait-section h3 {
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.custom-trait-input {
+  display: flex;
+  gap: 10px;
+}
+
+.custom-trait-input input {
+  flex: 1;
+  padding: 10px 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #333;
+  background: white;
+}
+
+.custom-trait-input input:focus {
+  outline: none;
+  border-color: #7F5AF0;
+}
+
+.custom-trait-input button {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #7F5AF0 0%, #6B4CE0 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.custom-trait-input button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(127, 90, 240, 0.3);
+}
+
+.custom-trait-input button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.current-traits {
+  padding-top: 30px;
+  border-top: 2px solid #f0f0f0;
+}
+
+.current-traits h3 {
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.current-trait-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.current-trait-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.current-trait-item span {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.current-trait-item button {
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  color: #666;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.current-trait-item button:hover {
+  background: #ff4444;
+  color: white;
+  border-color: #ff4444;
+}
+
+.modal-actions {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 2px solid #f0f0f0;
+  display: flex;
+  justify-content: center;
+}
+
+.modal-actions .primary-btn {
+  padding: 12px 40px;
+  background: linear-gradient(135deg, #7F5AF0 0%, #6B4CE0 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-actions .primary-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(127, 90, 240, 0.4);
+}
+
+/* Profile UI */
+.set-profile-btn {
+  margin-left: 10px;
+  padding: 4px 12px;
+  background: linear-gradient(135deg, #7F5AF0 0%, #6B4CE0 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.set-profile-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(127, 90, 240, 0.3);
+}
+
+.profile-btn {
+  padding: 8px 16px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: all 0.2s;
+}
+
+.profile-btn:hover {
+  border-color: #7F5AF0;
+  transform: translateY(-2px);
+}
+
+/* Profile Modal */
+.profile-modal {
+  max-width: 500px;
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #333;
+  font-size: 1rem;
+}
+
+.form-group input {
+  padding: 12px 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #333;
+  background: white;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #7F5AF0;
+}
+
+.gender-options {
+  display: flex;
+  gap: 10px;
+}
+
+.gender-btn {
+  flex: 1;
+  padding: 10px 15px;
+  border: 2px solid #e0e0e0;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: #333;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.gender-btn:hover {
+  border-color: #7F5AF0;
+  background: #f8f4ff;
+  color: #333;
+}
+
+.gender-btn.active {
+  border-color: #7F5AF0;
+  background: linear-gradient(135deg, #7F5AF0 0%, #6B4CE0 100%);
+  color: white;
+  font-weight: 600;
 }

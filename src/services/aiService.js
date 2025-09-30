@@ -21,7 +21,11 @@ class AIService {
   }
 
   generateSystemPrompt(userContext) {
-    const { curiosities, attributes, needs, dailyPlaybook, recentReflections, vision } = userContext;
+    const { curiosities, attributes, needs, dailyPlaybook, recentReflections, vision, profile } = userContext;
+    
+    const userName = profile?.name || 'the user';
+    const gender = profile?.gender || 'other';
+    const pronouns = gender === 'male' ? 'he/him' : gender === 'female' ? 'she/her' : 'they/them';
     
     return `You are LOA (Logistics and Operations Assistant), a personal development coach integrated into the Awake app. Your role is to help users explore their curiosities, develop their character attributes, and take aligned actions.
 
@@ -31,6 +35,10 @@ CORE PHILOSOPHY:
 - Support users in becoming the most aligned version of themselves
 - Suggest actions that feel inspiring rather than forced
 - Provide specific, actionable guidance based on current state
+
+USER'S PROFILE:
+Name: ${userName}
+Pronouns: ${pronouns}
 
 USER'S CURRENT STATE:
 ${vision ? `Vision: "${vision}"` : ""}
@@ -331,19 +339,41 @@ IMPORTANT:
     return colors[category] || '#7F5AF0';
   }
 
-  // Vision Creation - Guide user through vision steps
+  // Vision Creation - Guide user through vision in freeform conversation
   async sendVisionMessage(message, context) {
     if (!this.isInitialized) {
       throw new Error('AI service not initialized. Please provide an API key.');
     }
 
-    const { currentStep, visionData, conversationHistory = [] } = context;
+    const { conversationHistory = [], userContext = {} } = context;
+    const userName = userContext?.profile?.name || 'the user';
+    const gender = userContext?.profile?.gender || 'other';
+    const pronouns = gender === 'male' ? 'he/him' : gender === 'female' ? 'she/her' : 'they/them';
     
-    const systemPrompt = `You are LOA guiding vision creation. Current: ${currentStep.title}. Be warm, encouraging, push for specificity. Remind: THIRD PERSON, PRESENT TENSE.`;
+    const systemPrompt = `You are LOA (Logistics and Operations Assistant), guiding ${userName} through creating their personal Vision - a powerful statement of who they're becoming.
+
+USER INFO:
+Name: ${userName}
+Pronouns: ${pronouns}
+
+KEY PRINCIPLES:
+- Write in THIRD PERSON, PRESENT TENSE (as if it's already happening)
+- Use "more and more" language for believability (e.g., "${userName !== 'the user' ? userName : '[Name]'} is becoming more and more fit" not "is fit")
+- Use ${userName !== 'the user' ? userName : 'their name'} and ${pronouns} pronouns consistently
+- Be warm, encouraging, and push for specificity
+- Help them explore: Career, Health, Relationships, Personal Growth, Financial Abundance, Creative Expression
+- Vision is a living document - they can always expand it later
+
+CONVERSATION STYLE:
+- Ask open-ended questions to draw out details
+- Celebrate their responses
+- Encourage sensory details and specific markers
+- Remind them: no limitations, dream big
+- Keep responses concise and engaging`;
     
     const messages = [
       { role: 'user', content: systemPrompt },
-      ...conversationHistory.slice(-4).map(msg => ({
+      ...conversationHistory.slice(-6).map(msg => ({
         role: msg.sender === 'You' ? 'user' : 'assistant',
         content: msg.text
       })),
@@ -353,7 +383,7 @@ IMPORTANT:
     try {
       const response = await this.client.messages.create({
         model: 'claude-3-5-haiku-20241022',
-        max_tokens: 1000,
+        max_tokens: 1200,
         messages
       });
 
@@ -374,7 +404,13 @@ IMPORTANT:
 
 ${Object.entries(visionData).map(([key, value]) => `${key}: ${value}`).join('\n')}
 
-Rules: Third person, present tense, "increasingly/more and more" language. Make it feel ALIVE!`;
+Rules: 
+- Third person, present tense
+- "increasingly/more and more" language
+- Use the person's actual name if mentioned in the conversation
+- If no name is mentioned, use "they/them" pronouns
+- NEVER assume gender (no he/his or she/her unless explicitly stated by the user)
+- Make it feel ALIVE!`;
 
     try {
       const response = await this.client.messages.create({

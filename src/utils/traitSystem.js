@@ -87,15 +87,19 @@ export const TRAIT_SUGGESTIONS = [
   { name: 'Creativity', description: 'Express yourself through art, writing, and innovation' },
   { name: 'Discipline', description: 'Build consistency and follow through on commitments' },
   { name: 'Communication', description: 'Connect clearly and meaningfully with others' },
-  { name: 'Focus', description: 'Maintain attention and avoid distractions' },
+  { name: 'Consistency', description: 'Show up regularly and build lasting habits' },
   { name: 'Fitness', description: 'Improve physical health and energy' },
-  { name: 'Curiosity', description: 'Explore new ideas and learn continuously' },
+  { name: 'Learning', description: 'Explore new ideas and expand knowledge' },
   { name: 'Empathy', description: 'Understand and connect with others\' feelings' },
   { name: 'Resilience', description: 'Bounce back from challenges and setbacks' },
   { name: 'Courage', description: 'Take bold actions despite fear' },
   { name: 'Mindfulness', description: 'Stay present and aware in each moment' },
   { name: 'Leadership', description: 'Guide and inspire others' },
-  { name: 'Organization', description: 'Structure your environment and tasks effectively' }
+  { name: 'Organization', description: 'Structure your environment and tasks effectively' },
+  { name: 'Patience', description: 'Stay calm and composed through challenges' },
+  { name: 'Confidence', description: 'Trust yourself and your abilities' },
+  { name: 'Gratitude', description: 'Appreciate what you have and express thanks' },
+  { name: 'Authenticity', description: 'Be true to yourself and your values' }
 ];
 
 /**
