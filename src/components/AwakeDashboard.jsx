@@ -44,6 +44,7 @@ const AwakeDashboard = () => {
   // Daily Reflection state
   const [showReflection, setShowReflection] = useState(false);
   const [showVisionCreation, setShowVisionCreation] = useState(false);
+  const [existingVisionSections, setExistingVisionSections] = useState(null);
   const [reflectionHistory, setReflectionHistory] = useState([]);
 
   // Trait customization state
@@ -339,6 +340,22 @@ const AwakeDashboard = () => {
 
   // Vision editing functions
   const startEditingVision = () => {
+    // Load existing vision sections if they exist
+    const fullVisionData = localStorage.getItem('awake-full-vision');
+    if (fullVisionData) {
+      try {
+        const parsed = JSON.parse(fullVisionData);
+        if (parsed.sections) {
+          setExistingVisionSections(parsed.sections);
+          setShowVisionCreation(true);
+          return;
+        }
+      } catch (e) {
+        console.error('Error loading vision sections:', e);
+      }
+    }
+    
+    // Fallback to old simple text editing
     setVisionText(vision);
     setIsEditingVision(true);
   };
@@ -530,11 +547,13 @@ const AwakeDashboard = () => {
   };
 
   const startVisionCreation = () => {
+    setExistingVisionSections(null); // Clear any existing sections for new creation
     setShowVisionCreation(true);
   };
 
   const handleVisionComplete = (visionResult) => {
     setShowVisionCreation(false);
+    setExistingVisionSections(null); // Clear after closing
     
     if (!visionResult.cancelled) {
       // Save the compiled vision
@@ -946,6 +965,7 @@ const AwakeDashboard = () => {
         <VisionCreationChat
           onComplete={handleVisionComplete}
           userContext={{ curiosities, attributes, needs, vision, profile }}
+          existingSections={existingVisionSections}
           apiKey={apiKey}
         />
       )}

@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import './VisionCreationChat.css';
 
-const VisionCreationChat = ({ onComplete, userContext }) => {
+const VisionCreationChat = ({ onComplete, userContext, existingSections }) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [visionSections, setVisionSections] = useState({
-    career: '',
-    health: '',
-    relationships: '',
-    personal: '',
-    financial: '',
-    creative: ''
-  });
+  const [visionSections, setVisionSections] = useState(
+    existingSections || {
+      career: '',
+      health: '',
+      relationships: '',
+      personal: '',
+      financial: '',
+      creative: ''
+    }
+  );
 
   const steps = [
     {
