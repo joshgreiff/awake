@@ -254,4 +254,147 @@
 
 .vision-form::-webkit-scrollbar-thumb:hover {
   background: #b0b0b0;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .vision-content {
+    width: 95%;
+    max-width: 95%;
+    max-height: 90vh;
+    border-radius: 12px;
+  }
+
+  .vision-header {
+    padding: 20px 15px;
+  }
+
+  .vision-header h2 {
+    font-size: 1.3rem;
+  }
+
+  .vision-close-btn {
+    top: 15px;
+    right: 15px;
+    width: 32px;
+    height: 32px;
+    font-size: 1.2rem;
+  }
+
+  .vision-progress {
+    padding: 10px 15px;
+  }
+
+  .step-indicator {
+    font-size: 0.85rem;
+  }
+
+  .progress-bar {
+    height: 5px;
+  }
+
+  .vision-body {
+    padding: 15px;
+  }
+
+  .step-header h3 {
+    font-size: 1.2rem;
+  }
+
+  .step-prompt {
+    font-size: 0.9rem;
+  }
+
+  .tip-box {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+
+  .vision-textarea-container textarea {
+    min-height: 150px;
+    font-size: 0.9rem;
+    padding: 12px;
+  }
+
+  .char-count {
+    font-size: 0.75rem;
+  }
+
+  .vision-navigation {
+    padding: 15px;
+    gap: 8px;
+    flex-direction: column;
+  }
+
+  .nav-btn,
+  .skip-btn,
+  .save-btn {
+    width: 100%;
+    padding: 10px 16px;
+    font-size: 0.9rem;
+  }
+
+  .nav-btn.back {
+    order: 2;
+  }
+
+  .nav-btn.next {
+    order: 1;
+  }
+
+  .skip-btn {
+    order: 3;
+  }
+}
+
+@media (max-width: 480px) {
+  .vision-content {
+    width: 98%;
+    max-height: 95vh;
+    border-radius: 8px;
+  }
+
+  .vision-header {
+    padding: 15px 12px;
+  }
+
+  .vision-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .vision-close-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 1rem;
+  }
+
+  .step-header h3 {
+    font-size: 1.1rem;
+  }
+
+  .step-prompt {
+    font-size: 0.85rem;
+  }
+
+  .tip-box {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+
+  .vision-textarea-container textarea {
+    min-height: 120px;
+    font-size: 0.85rem;
+    padding: 10px;
+  }
+
+  .char-count {
+    font-size: 0.7rem;
+  }
+
+  .nav-btn,
+  .skip-btn,
+  .save-btn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
 } 

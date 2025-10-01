@@ -28,7 +28,11 @@ class NostrAuthService {
         this.privateKey = storedPrivateKey;
         this.publicKey = getPublicKey(storedPrivateKey);
         this.isAuthenticated = true;
-        await this.loadUserProfile();
+        
+        // Load profile with timeout to prevent infinite loading
+        const profilePromise = this.loadUserProfile();
+        const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2000));
+        await Promise.race([profilePromise, timeoutPromise]);
       }
       
       return this.isAuthenticated;

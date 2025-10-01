@@ -296,4 +296,111 @@
 
 .reflection-messages::-webkit-scrollbar-thumb:hover {
   background: #b0b0b0;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .reflection-content {
+    width: 95%;
+    max-width: 95%;
+    max-height: 90vh;
+    border-radius: 12px;
+  }
+
+  .reflection-header {
+    padding: 20px 15px;
+  }
+
+  .reflection-header h2 {
+    font-size: 1.3rem;
+  }
+
+  .reflection-close-btn {
+    top: 15px;
+    right: 15px;
+    width: 32px;
+    height: 32px;
+    font-size: 1.2rem;
+  }
+
+  .reflection-body {
+    padding: 15px;
+  }
+
+  .reflection-messages {
+    padding: 15px 10px;
+    max-height: 40vh;
+  }
+
+  .message {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+
+  .reflection-input-container {
+    padding: 12px;
+    gap: 8px;
+    flex-direction: column;
+  }
+
+  .reflection-input {
+    font-size: 0.9rem;
+  }
+
+  .input-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .input-row input {
+    width: 100%;
+  }
+
+  .send-btn,
+  .generate-playbook-btn {
+    width: 100%;
+    padding: 10px 16px;
+    font-size: 0.9rem;
+  }
+
+  .progress-bar {
+    height: 5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .reflection-content {
+    width: 98%;
+    max-height: 95vh;
+    border-radius: 8px;
+  }
+
+  .reflection-header {
+    padding: 15px 12px;
+  }
+
+  .reflection-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .reflection-close-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 1rem;
+  }
+
+  .message {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+
+  .reflection-input {
+    font-size: 0.85rem;
+  }
+
+  .send-btn,
+  .generate-playbook-btn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
 } 

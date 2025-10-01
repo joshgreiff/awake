@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import aiService from '../services/aiService';
-import nostrAuth from '../services/nostrAuth';
-import awakeDB from '../storage/awakeDB';
-import NostrAuthModal from './NostrAuthModal';
+import simpleAuth from '../services/simpleAuth';
+import SimpleAuthModal from './SimpleAuthModal';
 import DailyReflectionChat from './DailyReflectionChat';
 import VisionCreationChat from './VisionCreationChat';
 import ProgressInsights from './ProgressInsights';
@@ -57,13 +56,27 @@ const AwakeDashboard = () => {
 
   // Initialize authentication and load user data
   useEffect(() => {
-    const initializeAuth = async () => {
-      const { userId } = await nostrAuth.initialize();
-      setUserId(userId);
-      setCurrentUserId(userId || 'local');
+    const initializeAuth = () => {
+      setIsLoading(true);
       
-      // Always load data, even if no userId
-      await loadUserData(userId || 'local');
+      // Check if user exists
+      const userExists = simpleAuth.initialize();
+      
+      if (userExists) {
+        const user = simpleAuth.getUserInfo();
+        setUserId(user.id);
+        setCurrentUserId(user.id);
+        setUserInfo(user);
+        setIsAuthenticated(true);
+        
+        // Load user data
+        loadUserData(user.id);
+      } else {
+        // Show auth modal for new users
+        setShowAuthModal(true);
+      }
+      
+      setIsLoading(false);
     };
     
     initializeAuth();
@@ -160,10 +173,10 @@ const AwakeDashboard = () => {
       // Initialize with defaults
       const defaultData = {
         curiosities: [
-          { id: 1, text: "Pokemon TCG competing", inspiration: 70 },
-          { id: 2, text: "AnyLingo app creation", inspiration: 85 },
-          { id: 3, text: "Wander Studios building/administration", inspiration: 60 },
-          { id: 4, text: "Bitcoin education/advocacy", inspiration: 75 }
+          { id: 1, text: "Learning a new skill", inspiration: 70 },
+          { id: 2, text: "Building something meaningful", inspiration: 85 },
+          { id: 3, text: "Connecting with others", inspiration: 60 },
+          { id: 4, text: "Personal growth & development", inspiration: 75 }
         ],
         attributes: [
           createTrait('Creativity', 0),
@@ -546,6 +559,26 @@ const AwakeDashboard = () => {
     }
   };
 
+  // Handle authentication success
+  const handleAuthSuccess = (username) => {
+    const success = simpleAuth.createUser(username);
+    
+    if (success) {
+      const user = simpleAuth.getUserInfo();
+      setUserId(user.id);
+      setCurrentUserId(user.id);
+      setUserInfo(user);
+      setIsAuthenticated(true);
+      setShowAuthModal(false);
+      
+      // Set profile name
+      setProfile({ name: username, gender: 'other' });
+      
+      // Load user data (will use defaults for new user)
+      loadUserData(user.id);
+    }
+  };
+
   const startVisionCreation = () => {
     setExistingVisionSections(null); // Clear any existing sections for new creation
     setShowVisionCreation(true);
@@ -584,30 +617,34 @@ const AwakeDashboard = () => {
     );
   }
 
+  // Show auth modal if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <>
+        {showAuthModal && (
+          <SimpleAuthModal onAuthSuccess={handleAuthSuccess} />
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="awake-dashboard">
       {/* Header */}
       <div className="dashboard-header">
         <div className="user-section">
           <h1>Awake Dashboard</h1>
-          <p>
-            {profile.name || 'User'} | Level: {character.level} | Tokens: {Math.floor(character.xp / 10)}
-            {!profile.name && (
-              <button className="set-profile-btn" onClick={() => setShowProfileModal(true)}>
-                Set Profile
-              </button>
-            )}
+          <p className="user-stats">
+            {userInfo?.username || profile.name || 'User'} | Level: {character.level} | Tokens: {Math.floor(character.xp / 10)}
           </p>
         </div>
         <div className="header-actions">
           <button className="reflection-btn" onClick={startDailyReflection}>
             📝 Daily Reflection
           </button>
-          {profile.name && (
-            <button className="profile-btn" onClick={() => setShowProfileModal(true)} title="Edit Profile">
-              👤
-            </button>
-          )}
+          <button className="profile-btn" onClick={() => setShowProfileModal(true)} title="Edit Profile">
+            👤
+          </button>
           {!apiKey && (
             <button className="setup-ai-btn" onClick={() => setShowApiKeyModal(true)}>
               🤖 Setup AI
@@ -1096,6 +1133,11 @@ const AwakeDashboard = () => {
               <button 
                 className="primary-btn" 
                 onClick={() => {
+                  // Update username in simpleAuth if changed
+                  if (profile.name && profile.name !== userInfo?.username) {
+                    simpleAuth.updateUsername(profile.name);
+                    setUserInfo({ ...userInfo, username: profile.name });
+                  }
                   saveUserData({ curiosities, attributes, needs, vision, profile });
                   setShowProfileModal(false);
                 }}

@@ -1302,3 +1302,366 @@
   font-size: 1rem;
   font-weight: 500;
 }
+
+/* ===== MOBILE RESPONSIVE STYLES ===== */
+
+/* Tablet styles (768px - 1024px) */
+@media (max-width: 1024px) {
+  .awake-dashboard {
+    padding: 15px;
+  }
+
+  .dashboard-header {
+    padding: 15px 20px;
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+
+  .user-section h1 {
+    font-size: 1.5rem;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .vision-card {
+    grid-column: 1;
+  }
+}
+
+/* Mobile styles (max-width: 768px) */
+@media (max-width: 768px) {
+  .awake-dashboard {
+    padding: 10px;
+    max-width: 100%;
+  }
+
+  /* Header */
+  .dashboard-header {
+    padding: 12px 15px;
+    margin-bottom: 20px;
+  }
+
+  .user-section h1 {
+    font-size: 1.3rem;
+    margin-bottom: 3px;
+  }
+
+  .user-stats {
+    font-size: 0.85rem;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .daily-reflection-btn,
+  .set-profile-btn,
+  .profile-btn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  /* Dashboard Cards */
+  .dashboard-card {
+    padding: 15px;
+    margin-bottom: 15px;
+  }
+
+  .dashboard-card h3 {
+    font-size: 1.2rem;
+  }
+
+  .card-header {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Vision Card */
+  .vision-card {
+    grid-column: 1;
+  }
+
+  .vision-textarea {
+    min-height: 150px;
+    font-size: 0.9rem;
+  }
+
+  .vision-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .vision-actions button {
+    width: 100%;
+  }
+
+  .create-vision-btn {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+  }
+
+  /* Curiosities */
+  .curiosities-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .curiosity-card {
+    padding: 12px;
+  }
+
+  .add-curiosity-form {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .add-curiosity-form input {
+    width: 100%;
+  }
+
+  /* Traits */
+  .traits-subtitle {
+    font-size: 0.85rem;
+  }
+
+  .attribute-item {
+    padding: 10px;
+  }
+
+  .trait-name {
+    font-size: 0.95rem;
+  }
+
+  .attribute-level {
+    font-size: 0.85rem;
+  }
+
+  .level-progress {
+    height: 6px;
+  }
+
+  /* Needs */
+  .need-item {
+    padding: 10px;
+  }
+
+  .need-header {
+    font-size: 0.9rem;
+  }
+
+  .need-bar {
+    height: 8px;
+  }
+
+  /* Playbook */
+  .playbook-item {
+    padding: 12px;
+  }
+
+  .playbook-text {
+    font-size: 0.9rem;
+  }
+
+  .playbook-category {
+    font-size: 0.75rem;
+  }
+
+  .playbook-traits {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .trait-badge {
+    padding: 3px 8px;
+    font-size: 0.7rem;
+  }
+
+  /* Chat */
+  .chat-container {
+    margin-top: 15px;
+  }
+
+  .chat-messages {
+    max-height: 300px;
+    padding: 10px;
+  }
+
+  .message {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+  }
+
+  .chat-input-container {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .chat-input {
+    font-size: 0.9rem;
+  }
+
+  .send-btn {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+  }
+
+  /* Modals */
+  .modal-overlay {
+    padding: 10px;
+  }
+
+  .modal-content,
+  .reflection-modal,
+  .vision-modal,
+  .trait-modal,
+  .profile-modal {
+    width: 95%;
+    max-width: 95%;
+    padding: 20px 15px;
+    margin: 10px auto;
+  }
+
+  .modal-content h2,
+  .reflection-modal h2,
+  .vision-modal h2 {
+    font-size: 1.3rem;
+  }
+
+  /* Trait Modal */
+  .trait-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .trait-suggestion-btn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  .custom-trait-input {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .custom-trait-input input {
+    width: 100%;
+  }
+
+  /* Profile Modal */
+  .gender-options {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .gender-btn {
+    width: 100%;
+  }
+
+  /* Progress Insights */
+  .insights-container {
+    padding: 15px;
+  }
+
+  .chart-container {
+    height: 250px;
+  }
+
+  /* Buttons */
+  .add-btn,
+  .edit-btn,
+  .save-btn,
+  .cancel-btn,
+  .primary-btn,
+  .secondary-btn {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+  }
+
+  /* Loading Screen */
+  .loading-spinner {
+    font-size: 2rem;
+  }
+
+  .loading-content h2 {
+    font-size: 1.3rem;
+  }
+}
+
+/* Small mobile styles (max-width: 480px) */
+@media (max-width: 480px) {
+  .awake-dashboard {
+    padding: 8px;
+  }
+
+  .dashboard-header {
+    padding: 10px 12px;
+  }
+
+  .user-section h1 {
+    font-size: 1.1rem;
+  }
+
+  .user-stats {
+    font-size: 0.8rem;
+  }
+
+  .dashboard-card {
+    padding: 12px;
+  }
+
+  .dashboard-card h3 {
+    font-size: 1.1rem;
+  }
+
+  .vision-textarea {
+    min-height: 120px;
+    font-size: 0.85rem;
+  }
+
+  .curiosity-card h4 {
+    font-size: 0.95rem;
+  }
+
+  .inspiration-level {
+    font-size: 0.75rem;
+  }
+
+  .trait-name {
+    font-size: 0.9rem;
+  }
+
+  .attribute-level {
+    font-size: 0.8rem;
+  }
+
+  .playbook-text {
+    font-size: 0.85rem;
+  }
+
+  .message {
+    font-size: 0.85rem;
+    padding: 6px 10px;
+  }
+
+  .chat-input {
+    font-size: 0.85rem;
+  }
+
+  .modal-content h2 {
+    font-size: 1.2rem;
+  }
+
+  .chart-container {
+    height: 200px;
+  }
+}
