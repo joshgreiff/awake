@@ -263,13 +263,16 @@ TASK REQUIREMENTS:
 - Align with their vision and what they shared in reflection
 - Mix different types: 🧠 mental, 💪 physical, 🤝 social, 🎯 vision-aligned
 
+AVAILABLE TRAITS (use ONLY these traits):
+${attributes.map(a => a.name).join(', ')}
+
 FORMAT YOUR RESPONSE AS A JSON ARRAY:
 [
   {
     "task": "Take a 15-minute walk outside",
     "category": "Energy",
     "emoji": "💪",
-    "traits": ["Fitness", "Energy"],
+    "traits": ["Fitness"],
     "xpGain": 15
   },
   {
@@ -283,6 +286,8 @@ FORMAT YOUR RESPONSE AS A JSON ARRAY:
 
 IMPORTANT: 
 - Return ONLY valid JSON, no markdown or explanation
+- Only use traits from the AVAILABLE TRAITS list above
+- Each task should improve 1-2 traits max
 - Include 3-5 tasks based on what will genuinely help them today
 - Make tasks specific to what they shared in reflection`;
 
