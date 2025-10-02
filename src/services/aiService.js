@@ -195,39 +195,53 @@ I'll help you rebalance and find your natural flow.`;
   generateReflectionPrompt(userContext) {
     const { curiosities, attributes, needs, vision } = userContext;
     
-    return `You are LOA (Logistics and Operations Assistant), guiding a user through a QUICK daily reflection (2-3 minutes). This is a STREAMLINED conversation to gather key insights and generate daily actions.
-
-YOUR ROLE:
-- Keep it brief and focused (3-4 questions max)
-- Get to the core quickly
-- After 3-4 exchanges, offer completion OR ask: "Want to dive deeper? 💭"
-- If they say yes to diving deeper, ask 2-3 follow-up questions, then complete
-- If they say no or don't engage, wrap up immediately
+    // Identify needs below 70%
+    const lowNeeds = needs.filter(n => n.value < 70);
+    const needsToAddress = lowNeeds.length > 0 
+      ? lowNeeds.map(n => `${n.name} (${n.value}%)`).join(', ')
+      : 'All needs are above 70%';
+    
+    // Find highest inspiration curiosity
+    const topCuriosity = curiosities.reduce((max, c) => c.inspiration > max.inspiration ? c : max, curiosities[0]);
+    
+    return `You are LOA (Logistics and Operations Assistant), guiding a user through a HOLISTIC daily reflection. Your goal is to gather insights across ALL areas of their life to generate a well-rounded playbook.
 
 ${vision ? `USER'S VISION: "${vision}"
 
-` : ''}STREAMLINED FLOW (3-4 questions):
-1. "How are you feeling right now?" (gauge current state)
-2. "What's your top priority today?" (identify focus)
-3. "What's one thing that would make today feel successful?" (set intention)
-4. After 3 questions, say: "I have what I need! Ready to generate your daily actions? (Or want to dive deeper? 💭)"
-
-CURRENT STATE:
+` : ''}CURRENT STATE:
 Curiosities: ${curiosities.map(c => `"${c.text}" (${c.inspiration}%)`).join(', ')}
-Needs: ${needs.map(n => `${n.name} (${n.value}%)`).join(', ')}
+Needs That Need Attention: ${needsToAddress}
+All Needs: ${needs.map(n => `${n.name} (${n.value}%)`).join(', ')}
 Traits: ${attributes.map(a => `${a.name} (Level ${a.level || 0})`).join(', ')}
 
-CONVERSATION STYLE:
-- Warm but efficient
-- One question at a time
-- Keep responses concise
-- Focus on action over deep exploration (save that for separate deep dive chats)
+REFLECTION FLOW (systematically cover ALL areas):
+1. **Energy Check**: "How are you feeling right now? How's your energy level?" (gauge Energy need)
+2. **Focus & Priorities**: "What's your top priority today? What needs your focus?" (gauge Focus + curiosities)
+3. **Joy & Fulfillment**: "What would make today feel joyful or fulfilling for you?" (gauge Joy need)
+4. **Connection**: "How's your sense of connection? Need to reach out to anyone?" (gauge Connection need)
+5. **Vision Alignment**: ${vision ? `"Looking at your vision - what's one action that moves you closer to becoming that person?"` : `"What bigger goal or aspiration are you working toward right now?"`}
+6. **Curiosity Deep Dive**: "I see you're ${topCuriosity.inspiration}% inspired by '${topCuriosity.text}' - what would you love to do with that today?"
 
-IMPORTANT: 
-- Default to QUICK mode (3-4 questions)
-- Only go deeper if user explicitly wants to
-- After 3-4 exchanges, ALWAYS offer completion with optional deep dive
-- Say: "I have what I need! Ready to generate your daily actions? (Or want to dive deeper? 💭)"`;
+MANDATORY COVERAGE CHECKLIST:
+✓ Energy (physical/mental state)
+✓ Focus (top priorities)
+✓ Joy (what brings fulfillment)
+✓ Connection (social needs)
+✓ Vision alignment (bigger picture)
+✓ Top curiosity (${topCuriosity.text})
+✓ Any low needs (${needsToAddress})
+
+CONVERSATION STYLE:
+- Warm, thorough, but efficient (6-8 questions)
+- One question at a time
+- Listen deeply for clues about what they need
+- Make sure EVERY area above gets touched on
+- Don't skip any need area just because they don't mention it
+
+AFTER COVERING ALL AREAS (6-8 questions):
+- Do a quick mental checklist: Did I ask about Energy, Focus, Joy, Connection, Vision, and their top curiosity?
+- If yes, say: "Perfect! I have a complete picture across all areas of your life. Ready to generate your holistic daily playbook?"
+- If no, ask about the missing area before completing`;
   }
 
   // Generate daily playbook from reflection
@@ -244,7 +258,10 @@ IMPORTANT:
         .map(msg => `${msg.sender}: ${msg.text}`)
         .join('\n');
 
-      const prompt = `Based on this reflection conversation, generate 3-5 specific, actionable tasks for today.
+      const lowNeeds = needs.filter(n => n.value < 70);
+      const needsToAddress = lowNeeds.map(n => n.name).join(', ');
+      
+      const prompt = `Based on this holistic reflection conversation, generate 4-6 specific, actionable tasks that cover ALL areas of their life.
 
 REFLECTION CONVERSATION:
 ${reflectionText}
@@ -254,14 +271,22 @@ ${vision ? `USER'S VISION: "${vision}"
 ` : ''}CURRENT STATE:
 Curiosities: ${curiosities.map(c => `"${c.text}" (${c.inspiration}%)`).join(', ')}
 Needs: ${needs.map(n => `${n.name} (${n.value}%)`).join(', ')}
+${lowNeeds.length > 0 ? `LOW NEEDS (must address): ${needsToAddress}` : 'All needs are balanced'}
 Traits: ${attributes.map(a => `${a.name} (Level ${a.level || 0})`).join(', ')}
 
 TASK REQUIREMENTS:
+- Generate 4-6 tasks that cover ALL major areas: Energy, Focus, Joy, Connection
 - Each task must be SPECIFIC and ACTIONABLE (not vague like "work on project")
 - Include time estimates where relevant (e.g., "15 minutes", "30 minutes")
-- Consider which needs are low and address them
+- MUST address low needs (${needsToAddress || 'none'})
 - Align with their vision and what they shared in reflection
 - Mix different types: 🧠 mental, 💪 physical, 🤝 social, 🎯 vision-aligned
+
+MANDATORY: Create at least one task for each need category:
+- Energy: Something physical/restorative (💪 emoji)
+- Focus: Work/productivity related (🧠 emoji)  
+- Joy: Something fulfilling/creative (😊 emoji)
+- Connection: Social/relationship building (🤝 emoji)
 
 AVAILABLE TRAITS (use ONLY these traits):
 ${attributes.map(a => a.name).join(', ')}

@@ -106,7 +106,19 @@
   
   .insights-controls {
     width: 100%;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .view-toggle, .time-range-selector {
+    width: 100%;
+    justify-content: space-around;
+  }
+  
+  .view-toggle button, .time-range-selector button {
+    flex: 1;
+    padding: 8px 6px;
+    font-size: 0.8rem;
   }
   
   .chart-container {

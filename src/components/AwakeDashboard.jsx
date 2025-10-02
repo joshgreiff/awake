@@ -59,6 +59,15 @@ const AwakeDashboard = () => {
     const initializeAuth = () => {
       setIsLoading(true);
       
+      // Clean up old Nostr data on first load with new auth system
+      if (!localStorage.getItem('awake_migrated_to_simple_auth')) {
+        console.log('Migrating from Nostr to Simple Auth...');
+        localStorage.removeItem('awake-user-data'); // Old global key
+        localStorage.removeItem('awake_nostr_private_key');
+        localStorage.removeItem('awake_user_profile');
+        localStorage.setItem('awake_migrated_to_simple_auth', 'true');
+      }
+      
       // Check if user exists
       const userExists = simpleAuth.initialize();
       
@@ -141,34 +150,38 @@ const AwakeDashboard = () => {
     }
   }, [apiKey]);
 
-  // Generate daily playbook when data changes
-  useEffect(() => {
-    if (isAuthenticated && curiosities.length > 0) {
-      generateDailyPlaybook();
-    }
-  }, [curiosities, attributes, needs, isAuthenticated]);
+  // Don't auto-generate playbook - only from daily reflection
+  // useEffect(() => {
+  //   if (isAuthenticated && curiosities.length > 0) {
+  //     generateDailyPlaybook();
+  //   }
+  // }, [curiosities, attributes, needs, isAuthenticated]);
 
   // Initialize chat
   useEffect(() => {
     if (isAuthenticated) {
-      setChatMessages([
-        { sender: 'LOA', text: "Hey! I can see your curiosities and current state. What's calling to you today?" }
-      ]);
+      setChatMessages([]);
     }
   }, [isAuthenticated]);
 
   const loadUserData = async (userId) => {
-    // Load from localStorage for now (simpler than IndexedDB for MVP)
-    const savedData = localStorage.getItem('awake-user-data');
+    // Load from localStorage using user-specific key
+    const userDataKey = `awake-user-data-${userId}`;
+    const savedData = localStorage.getItem(userDataKey);
     
     if (savedData) {
-      const data = JSON.parse(savedData);
-      setCuriosities(data.curiosities || []);
-      setAttributes(data.attributes || []);
-      setNeeds(data.needs || []);
-      setVision(data.vision || '');
-      setProfile(data.profile || { name: '', gender: 'other' });
-      setDailyPlaybook(data.dailyPlaybook || []);
+      try {
+        const data = JSON.parse(savedData);
+        setCuriosities(data.curiosities || []);
+        setAttributes(data.attributes || []);
+        setNeeds(data.needs || []);
+        setVision(data.vision || '');
+        setProfile(data.profile || { name: '', gender: 'other' });
+        setDailyPlaybook(data.dailyPlaybook || []);
+      } catch (e) {
+        console.error('Error loading user data:', e);
+        // Fall through to defaults
+      }
     } else {
       // Initialize with defaults
       const defaultData = {
@@ -204,7 +217,10 @@ const AwakeDashboard = () => {
   };
 
   const saveUserData = (data) => {
-    localStorage.setItem('awake-user-data', JSON.stringify(data || {
+    if (!currentUserId) return;
+    
+    const userDataKey = `awake-user-data-${currentUserId}`;
+    localStorage.setItem(userDataKey, JSON.stringify(data || {
       curiosities,
       attributes,
       needs,
@@ -964,6 +980,7 @@ const AwakeDashboard = () => {
           userId={currentUserId}
           needs={needs}
           attributes={attributes}
+          curiosities={curiosities}
         />
 
       </div>

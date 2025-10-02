@@ -4,9 +4,9 @@ import { getSnapshots, getNeedTrend, getTraitTrend, getInsights, getWeeklyAverag
 import { getTraitColor } from '../utils/traitSystem';
 import './ProgressInsights.css';
 
-const ProgressInsights = ({ userId, needs, attributes }) => {
+const ProgressInsights = ({ userId, needs, attributes, curiosities }) => {
   const [timeRange, setTimeRange] = useState(7); // 7, 14, or 30 days
-  const [selectedView, setSelectedView] = useState('needs'); // 'needs' or 'traits'
+  const [selectedView, setSelectedView] = useState('needs'); // 'needs', 'traits', or 'curiosities'
   const [insights, setInsights] = useState([]);
   const [chartData, setChartData] = useState([]);
 
@@ -38,13 +38,25 @@ const ProgressInsights = ({ userId, needs, attributes }) => {
         return dataPoint;
       });
       setChartData(data);
-    } else {
+    } else if (selectedView === 'traits') {
       // Create chart data for traits (using score 0-10)
       const data = snapshots.map(s => {
         const dataPoint = { date: formatDate(s.date) };
         s.traits.forEach(t => {
           dataPoint[t.name] = t.score.toFixed(1);
         });
+        return dataPoint;
+      });
+      setChartData(data);
+    } else if (selectedView === 'curiosities') {
+      // Create chart data for curiosities inspiration levels
+      const data = snapshots.map(s => {
+        const dataPoint = { date: formatDate(s.date) };
+        if (s.curiosities) {
+          s.curiosities.forEach(c => {
+            dataPoint[c.text] = c.inspiration;
+          });
+        }
         return dataPoint;
       });
       setChartData(data);
@@ -61,14 +73,24 @@ const ProgressInsights = ({ userId, needs, attributes }) => {
       return getTraitColor(name);
     }
     
-    // Need colors
-    const needColors = {
-      'Energy': '#FF6B6B',
-      'Focus': '#4ECDC4',
-      'Joy': '#FFE66D',
-      'Connection': '#A8E6CF'
-    };
-    return needColors[name] || `hsl(${index * 60}, 70%, 60%)`;
+    if (selectedView === 'needs') {
+      // Need colors
+      const needColors = {
+        'Energy': '#FF6B6B',
+        'Focus': '#4ECDC4',
+        'Joy': '#FFE66D',
+        'Connection': '#A8E6CF'
+      };
+      return needColors[name] || `hsl(${index * 60}, 70%, 60%)`;
+    }
+    
+    // Curiosity colors - vibrant palette
+    const curiosityColors = [
+      '#FF6B6B', '#4ECDC4', '#FFE66D', '#A8E6CF',
+      '#FF8B94', '#95E1D3', '#F38181', '#AA96DA',
+      '#FCBAD3', '#FFFFD2', '#A8DADC', '#F1C0E8'
+    ];
+    return curiosityColors[index % curiosityColors.length];
   };
 
   if (chartData.length === 0) {
@@ -87,7 +109,9 @@ const ProgressInsights = ({ userId, needs, attributes }) => {
 
   const dataKeys = selectedView === 'needs' 
     ? needs.map(n => n.name)
-    : attributes.map(a => a.name);
+    : selectedView === 'traits'
+    ? attributes.map(a => a.name)
+    : curiosities.map(c => c.text);
 
   return (
     <div className="progress-insights">
@@ -106,6 +130,12 @@ const ProgressInsights = ({ userId, needs, attributes }) => {
               onClick={() => setSelectedView('traits')}
             >
               Traits
+            </button>
+            <button 
+              className={selectedView === 'curiosities' ? 'active' : ''}
+              onClick={() => setSelectedView('curiosities')}
+            >
+              Curiosities
             </button>
           </div>
           <div className="time-range-selector">
