@@ -167,6 +167,7 @@ const AwakeDashboard = () => {
   // Auto-save dailyPlaybook whenever it changes
   useEffect(() => {
     if (isAuthenticated && currentUserId && dailyPlaybook.length > 0) {
+      console.log('Saving daily playbook:', dailyPlaybook.length, 'items');
       saveUserData({ curiosities, attributes, needs, vision, profile, dailyPlaybook });
     }
   }, [dailyPlaybook]);
@@ -462,10 +463,20 @@ const AwakeDashboard = () => {
           );
           
           if (aiPlaybook && aiPlaybook.length > 0) {
+            console.log('Generated playbook from reflection:', aiPlaybook);
             setDailyPlaybook(aiPlaybook);
             
-            // Save playbook to localStorage
-            saveUserData({ curiosities, attributes, needs, vision, profile, dailyPlaybook: aiPlaybook });
+            // Save playbook to localStorage immediately
+            const updatedData = { 
+              curiosities, 
+              attributes, 
+              needs, 
+              vision, 
+              profile, 
+              dailyPlaybook: aiPlaybook 
+            };
+            saveUserData(updatedData);
+            console.log('Playbook saved to localStorage');
             
             // Show success message
             setChatMessages([
