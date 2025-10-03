@@ -190,6 +190,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 0 8px;
 }
 
 .need-header {
@@ -206,21 +207,73 @@
 }
 
 .need-bar {
+  width: 100%;
   height: 8px;
   background: #e0e0e0;
   border-radius: 4px;
   overflow: hidden;
+  position: relative;
+  box-sizing: border-box;
 }
 
 .need-fill {
   height: 100%;
   transition: width 0.3s ease;
   border-radius: 4px;
+  position: absolute;
+  left: 0;
+  top: 0;
 }
 
 .need-slider {
   width: 100%;
   margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 20px;
+  cursor: pointer;
+}
+
+.need-slider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 8px;
+  background: linear-gradient(to right, #2196F3 0%, #2196F3 var(--value), #ddd var(--value), #ddd 100%);
+  border-radius: 4px;
+  border: none;
+}
+
+.need-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2196F3;
+  cursor: pointer;
+  margin-top: -6px;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.need-slider::-moz-range-track {
+  width: 100%;
+  height: 8px;
+  background: linear-gradient(to right, #2196F3 0%, #2196F3 var(--value), #ddd var(--value), #ddd 100%);
+  border-radius: 4px;
+  border: none;
+}
+
+.need-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2196F3;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 /* Attributes Card */
@@ -547,7 +600,8 @@
 
 /* Chat Card */
 .chat-messages {
-  height: 200px;
+  min-height: 350px;
+  max-height: 500px;
   overflow-y: auto;
   border: 1px solid #e0e0e0;
   border-radius: 8px;

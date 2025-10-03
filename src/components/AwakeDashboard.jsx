@@ -164,6 +164,13 @@ const AwakeDashboard = () => {
     }
   }, [isAuthenticated]);
 
+  // Auto-save dailyPlaybook whenever it changes
+  useEffect(() => {
+    if (isAuthenticated && currentUserId && dailyPlaybook.length > 0) {
+      saveUserData({ curiosities, attributes, needs, vision, profile, dailyPlaybook });
+    }
+  }, [dailyPlaybook]);
+
   const loadUserData = async (userId) => {
     // Load from localStorage using user-specific key
     const userDataKey = `awake-user-data-${userId}`;
@@ -185,6 +192,13 @@ const AwakeDashboard = () => {
             try {
               const visionObj = JSON.parse(fullVisionData);
               visionText = visionObj.compiledVision || visionObj.identity || '';
+              
+              // If we found vision in global storage, save it to user-specific storage
+              if (visionText) {
+                data.vision = visionText;
+                localStorage.setItem(userDataKey, JSON.stringify(data));
+                console.log('Migrated vision from global to user-specific storage');
+              }
             } catch (e) {
               console.log('Could not parse full vision data');
             }
