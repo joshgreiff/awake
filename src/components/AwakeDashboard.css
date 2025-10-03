@@ -674,6 +674,45 @@
 }
 
 /* Daily Playbook - The Star */
+.playbook-header-with-streak {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.reflection-streak {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+  padding: 8px 16px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+}
+
+.streak-flame {
+  font-size: 1.2rem;
+  animation: flicker 2s ease-in-out infinite;
+}
+
+@keyframes flicker {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.streak-count {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: white;
+}
+
+.streak-label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 500;
+}
+
 .playbook-items {
   display: flex;
   flex-direction: column;
@@ -1518,6 +1557,29 @@
   }
 
   /* Playbook */
+  .playbook-header-with-streak {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .reflection-streak {
+    padding: 6px 12px;
+    font-size: 0.9rem;
+  }
+
+  .streak-flame {
+    font-size: 1rem;
+  }
+
+  .streak-count {
+    font-size: 1rem;
+  }
+
+  .streak-label {
+    font-size: 0.75rem;
+  }
+
   .playbook-item {
     padding: 12px;
   }

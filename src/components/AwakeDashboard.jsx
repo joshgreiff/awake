@@ -45,6 +45,8 @@ const AwakeDashboard = () => {
   const [showVisionCreation, setShowVisionCreation] = useState(false);
   const [existingVisionSections, setExistingVisionSections] = useState(null);
   const [reflectionHistory, setReflectionHistory] = useState([]);
+  const [reflectionStreak, setReflectionStreak] = useState(0);
+  const [lastReflectionDate, setLastReflectionDate] = useState(null);
 
   // Trait customization state
   const [showTraitModal, setShowTraitModal] = useState(false);
@@ -172,6 +174,27 @@ const AwakeDashboard = () => {
     }
   }, [dailyPlaybook]);
 
+  const calculateStreak = (lastDate) => {
+    if (!lastDate) return 0;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const last = new Date(lastDate);
+    last.setHours(0, 0, 0, 0);
+    
+    const diffTime = today - last;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    // If last reflection was today, streak continues
+    // If last reflection was yesterday, streak continues
+    // If more than 1 day ago, streak is broken
+    if (diffDays <= 1) {
+      return diffDays;
+    }
+    return -1; // Streak broken
+  };
+
   const loadUserData = async (userId) => {
     // Load from localStorage using user-specific key
     const userDataKey = `awake-user-data-${userId}`;
@@ -209,6 +232,19 @@ const AwakeDashboard = () => {
         
         setProfile(data.profile || { name: '', gender: 'other' });
         setDailyPlaybook(data.dailyPlaybook || []);
+        
+        // Load streak data
+        const streakData = data.reflectionStreak || { count: 0, lastDate: null };
+        const streakStatus = calculateStreak(streakData.lastDate);
+        
+        if (streakStatus === -1) {
+          // Streak broken, reset to 0
+          setReflectionStreak(0);
+          setLastReflectionDate(null);
+        } else {
+          setReflectionStreak(streakData.count || 0);
+          setLastReflectionDate(streakData.lastDate);
+        }
       } catch (e) {
         console.error('Error loading user data:', e);
         // Fall through to defaults
@@ -257,7 +293,11 @@ const AwakeDashboard = () => {
       needs,
       vision,
       profile,
-      dailyPlaybook
+      dailyPlaybook,
+      reflectionStreak: {
+        count: reflectionStreak,
+        lastDate: lastReflectionDate
+      }
     }));
   };
 
@@ -442,6 +482,41 @@ const AwakeDashboard = () => {
     
     // Only save and generate playbook if reflection was completed, not cancelled
     if (!reflectionSummary.cancelled) {
+      // Update streak
+      const today = new Date().toISOString().split('T')[0];
+      const lastDate = lastReflectionDate ? new Date(lastReflectionDate).toISOString().split('T')[0] : null;
+      
+      let newStreak = reflectionStreak;
+      let streakMessage = '';
+      
+      if (!lastDate || lastDate !== today) {
+        // Only increment if we haven't reflected today yet
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+        
+        if (lastDate === yesterday || !lastDate) {
+          // Streak continues or starts
+          newStreak = reflectionStreak + 1;
+          setReflectionStreak(newStreak);
+          
+          // Milestone messages
+          if (newStreak === 7) {
+            streakMessage = ' 🔥 7 day streak! You\'re building a powerful habit!';
+          } else if (newStreak === 30) {
+            streakMessage = ' 🔥🔥 30 day streak! You\'re unstoppable!';
+          } else if (newStreak === 100) {
+            streakMessage = ' 🔥🔥🔥 100 day streak! Legendary commitment!';
+          } else if (newStreak > 1) {
+            streakMessage = ` 🔥 ${newStreak} day streak!`;
+          }
+        } else {
+          // Streak broken, reset to 1
+          newStreak = 1;
+          setReflectionStreak(1);
+        }
+        
+        setLastReflectionDate(today);
+      }
+      
       // Save reflection to history
       const updatedHistory = [...reflectionHistory, reflectionSummary];
       setReflectionHistory(updatedHistory);
@@ -451,7 +526,7 @@ const AwakeDashboard = () => {
       
       // Show loading message
       setChatMessages([
-        { sender: 'LOA', text: "Great reflection! I'm generating your personalized daily playbook... ⏳" }
+        { sender: 'LOA', text: `Great reflection!${streakMessage} I'm generating your personalized daily playbook... ⏳` }
       ]);
       
       try {
@@ -976,7 +1051,16 @@ const AwakeDashboard = () => {
 
         {/* Daily Playbook - The Centerpiece */}
         <div className="dashboard-card playbook-card featured">
-          <h3>LOA's Daily Playbook</h3>
+          <div className="playbook-header-with-streak">
+            <h3>LOA's Daily Playbook</h3>
+            {reflectionStreak > 0 && (
+              <div className="reflection-streak">
+                <span className="streak-flame">🔥</span>
+                <span className="streak-count">{reflectionStreak}</span>
+                <span className="streak-label">day streak</span>
+              </div>
+            )}
+          </div>
           <div className="playbook-items">
             {dailyPlaybook.map(item => (
               <div key={item.id} className={`playbook-item ${item.completed ? 'completed' : ''}`}>
