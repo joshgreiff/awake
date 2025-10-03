@@ -623,7 +623,7 @@ const AwakeCore = () => {
         </div>
       </div>
 
-      {/* Current Needs */}
+      {/* Current State */}
       <div className="needs-section">
         <h2>Current State</h2>
         <div className="needs-grid">
@@ -791,4 +791,4 @@ const AwakeCore = () => {
   );
 };
 
-export default AwakeCore; 
+export default AwakeCore; t 

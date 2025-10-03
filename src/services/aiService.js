@@ -46,7 +46,7 @@ Curiosities: ${curiosities.map(c => `"${c.text}" (Inspiration: ${c.inspiration}%
 
 Attributes: ${attributes.map(a => `${a.name} (Level ${a.level || 0})`).join(', ')}
 
-Current Needs: ${needs.map(n => `${n.name} (${n.value}%)`).join(', ')}
+Current State (Needs): ${needs.map(n => `${n.name} (${n.value}%)`).join(', ')}
 
 Daily Playbook: ${dailyPlaybook.map(item => `${item.category}: ${item.suggestion}`).join(' | ')}
 

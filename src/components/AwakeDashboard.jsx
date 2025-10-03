@@ -175,7 +175,23 @@ const AwakeDashboard = () => {
         setCuriosities(data.curiosities || []);
         setAttributes(data.attributes || []);
         setNeeds(data.needs || []);
-        setVision(data.vision || '');
+        
+        // Load vision - try user-specific first, then fall back to global
+        let visionText = data.vision || '';
+        if (!visionText) {
+          // Try loading from global awake-full-vision as fallback
+          const fullVisionData = localStorage.getItem('awake-full-vision');
+          if (fullVisionData) {
+            try {
+              const visionObj = JSON.parse(fullVisionData);
+              visionText = visionObj.compiledVision || visionObj.identity || '';
+            } catch (e) {
+              console.log('Could not parse full vision data');
+            }
+          }
+        }
+        setVision(visionText);
+        
         setProfile(data.profile || { name: '', gender: 'other' });
         setDailyPlaybook(data.dailyPlaybook || []);
       } catch (e) {
@@ -712,9 +728,9 @@ const AwakeDashboard = () => {
           )}
         </div>
 
-        {/* Current Needs */}
+        {/* Current State */}
         <div className="dashboard-card needs-card">
-          <h3>Current Needs</h3>
+          <h3>Current State</h3>
           <div className="needs-list">
             {needs.map(need => (
               <div key={need.id} className="need-item">
