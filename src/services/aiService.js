@@ -193,7 +193,7 @@ I'll help you rebalance and find your natural flow.`;
   }
 
   generateReflectionPrompt(userContext) {
-    const { curiosities, attributes, needs, vision } = userContext;
+    const { curiosities, attributes, needs, vision, dailyPlaybook = [] } = userContext;
     
     // Identify needs below 70%
     const lowNeeds = needs.filter(n => n.value < 70);
@@ -204,9 +204,18 @@ I'll help you rebalance and find your natural flow.`;
     // Find highest inspiration curiosity
     const topCuriosity = curiosities.reduce((max, c) => c.inspiration > max.inspiration ? c : max, curiosities[0]);
     
+    // Check if there are tasks from yesterday
+    const hasExistingPlaybook = dailyPlaybook.length > 0;
+    const completedTasks = dailyPlaybook.filter(t => t.completed);
+    const incompleteTasks = dailyPlaybook.filter(t => !t.completed);
+    
     return `You are LOA (Logistics and Operations Assistant), a quick and focused daily reflection coach. Your goal: gather key insights in 4-5 questions to create a personalized playbook.
 
 ${vision ? `USER'S VISION: "${vision}"
+
+` : ''}${hasExistingPlaybook ? `YESTERDAY'S PLAYBOOK:
+Completed: ${completedTasks.length > 0 ? completedTasks.map(t => `"${t.suggestion}"`).join(', ') : 'None'}
+Incomplete: ${incompleteTasks.length > 0 ? incompleteTasks.map(t => `"${t.suggestion}"`).join(', ') : 'None'}
 
 ` : ''}CURRENT STATE:
 Curiosities: ${curiosities.map(c => `"${c.text}" (${c.inspiration}%)`).join(', ')}
@@ -215,11 +224,13 @@ All Needs: ${needs.map(n => `${n.name} (${n.value}%)`).join(', ')}
 Traits: ${attributes.map(a => `${a.name} (Level ${a.level || 0})`).join(', ')}
 
 REFLECTION FLOW (4-5 QUESTIONS MAX):
-Q1. "How are you feeling today? What's your energy and mood like?"
+${hasExistingPlaybook ? `Q1. "How did yesterday's tasks go? ${completedTasks.length > 0 ? 'Great job completing some!' : 'What got in the way?'}"
+Q2. "How are you feeling today? What's your energy like?"
+Q3. "What are your top 1-2 priorities today?"
+Q4. "What would make today feel fulfilling?"` : `Q1. "How are you feeling today? What's your energy and mood like?"
 Q2. "What are your top 1-2 priorities today?"
 Q3. "What would make today feel fulfilling?"
-Q4. "Anything on your mind about connection or your bigger goals?"
-Q5 (if needed). Brief follow-up if their answer was very vague
+Q4. "Anything on your mind about connection or your bigger goals?"`}
 
 CRITICAL RULES:
 ❌ NO follow-up questions asking for more details unless their answer was extremely vague (1-2 words)

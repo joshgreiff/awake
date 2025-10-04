@@ -1134,7 +1134,7 @@ const AwakeDashboard = () => {
       {showReflection && (
         <DailyReflectionChat
           onComplete={handleReflectionComplete}
-          userContext={{ curiosities, attributes, needs, vision, profile }}
+          userContext={{ curiosities, attributes, needs, vision, profile, dailyPlaybook }}
           apiKey={apiKey}
         />
       )}
