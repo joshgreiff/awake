@@ -33,6 +33,8 @@ const AwakeDashboard = () => {
   const [chatMessages, setChatMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState(null);
   const [newCuriosity, setNewCuriosity] = useState('');
   const [editingCuriosity, setEditingCuriosity] = useState(null);
 
@@ -159,12 +161,51 @@ const AwakeDashboard = () => {
   //   }
   // }, [curiosities, attributes, needs, isAuthenticated]);
 
-  // Initialize chat
+  // Initialize chat and load history
   useEffect(() => {
-    if (isAuthenticated) {
-      setChatMessages([]);
+    if (isAuthenticated && currentUserId) {
+      loadChatHistory();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, currentUserId]);
+  
+  const loadChatHistory = () => {
+    const historyKey = `awake-chat-history-${currentUserId}`;
+    const savedHistory = localStorage.getItem(historyKey);
+    if (savedHistory) {
+      try {
+        const history = JSON.parse(savedHistory);
+        setChatHistory(history);
+        // Load the most recent chat if exists
+        if (history.length > 0) {
+          const latestChat = history[0];
+          setCurrentChatId(latestChat.id);
+          setChatMessages(latestChat.messages || []);
+        }
+      } catch (e) {
+        console.error('Error loading chat history:', e);
+      }
+    }
+  };
+  
+  const saveChatHistory = (updatedHistory) => {
+    const historyKey = `awake-chat-history-${currentUserId}`;
+    localStorage.setItem(historyKey, JSON.stringify(updatedHistory));
+    setChatHistory(updatedHistory);
+  };
+  
+  const startNewChat = () => {
+    const newChatId = Date.now().toString();
+    setCurrentChatId(newChatId);
+    setChatMessages([]);
+  };
+  
+  const loadChat = (chatId) => {
+    const chat = chatHistory.find(c => c.id === chatId);
+    if (chat) {
+      setCurrentChatId(chat.id);
+      setChatMessages(chat.messages || []);
+    }
+  };
 
   // Auto-save dailyPlaybook whenever it changes
   useEffect(() => {
@@ -596,7 +637,12 @@ const AwakeDashboard = () => {
   const sendMessage = async (messageText = currentMessage) => {
     if (!messageText.trim()) return;
     
-    const userMessage = { sender: 'You', text: messageText };
+    // Start a new chat if none exists
+    if (!currentChatId) {
+      startNewChat();
+    }
+    
+    const userMessage = { sender: 'You', text: messageText, timestamp: Date.now() };
     const newMessages = [...chatMessages, userMessage];
     setChatMessages(newMessages);
     setCurrentMessage('');
@@ -621,12 +667,38 @@ const AwakeDashboard = () => {
         }
       }
 
-      setChatMessages([...newMessages, { sender: 'LOA', text: aiResponse }]);
+      const finalMessages = [...newMessages, { sender: 'LOA', text: aiResponse, timestamp: Date.now() }];
+      setChatMessages(finalMessages);
+      
+      // Save chat to history
+      const updatedHistory = [...chatHistory];
+      const existingChatIndex = updatedHistory.findIndex(c => c.id === currentChatId);
+      
+      const chatToSave = {
+        id: currentChatId || Date.now().toString(),
+        title: newMessages[0]?.text.substring(0, 50) || 'New Chat',
+        messages: finalMessages,
+        lastUpdated: Date.now()
+      };
+      
+      if (existingChatIndex >= 0) {
+        updatedHistory[existingChatIndex] = chatToSave;
+      } else {
+        updatedHistory.unshift(chatToSave);
+      }
+      
+      // Keep only last 50 chats
+      if (updatedHistory.length > 50) {
+        updatedHistory.splice(50);
+      }
+      
+      saveChatHistory(updatedHistory);
     } catch (error) {
       console.error('Error sending message:', error);
       setChatMessages([...newMessages, { 
         sender: 'LOA', 
-        text: "I'm having trouble connecting right now. Let me know if you'd like to try again!" 
+        text: "I'm having trouble connecting right now. Let me know if you'd like to try again!",
+        timestamp: Date.now()
       }]);
     } finally {
       setIsChatLoading(false);
@@ -773,6 +845,13 @@ const AwakeDashboard = () => {
         <div className="header-actions">
           <button className="reflection-btn" onClick={startDailyReflection}>
             📝 Daily Reflection
+          </button>
+          <button 
+            className="community-btn" 
+            onClick={() => window.open('https://www.skool.com/awake', '_blank')}
+            title="Join Community"
+          >
+            👥 Community
           </button>
           <button className="profile-btn" onClick={() => setShowProfileModal(true)} title="Edit Profile">
             👤
@@ -993,7 +1072,32 @@ const AwakeDashboard = () => {
 
         {/* LOA Chat */}
         <div className="dashboard-card chat-card">
-          <h3>Chat with LOA</h3>
+          <div className="chat-header-row">
+            <h3>Chat with LOA</h3>
+            <button className="new-chat-btn" onClick={startNewChat} title="Start New Chat">
+              ➕ New Chat
+            </button>
+          </div>
+          
+          {chatHistory.length > 0 && (
+            <details className="chat-history-dropdown">
+              <summary>Chat History ({chatHistory.length})</summary>
+              <div className="chat-history-list">
+                {chatHistory.map(chat => (
+                  <div 
+                    key={chat.id}
+                    className={`chat-history-item ${currentChatId === chat.id ? 'active' : ''}`}
+                    onClick={() => loadChat(chat.id)}
+                  >
+                    <div className="chat-history-title">{chat.title}...</div>
+                    <div className="chat-history-date">
+                      {new Date(chat.lastUpdated).toLocaleDateString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
           
           {chatMessages.length === 0 && (
             <div className="chat-prompts">
