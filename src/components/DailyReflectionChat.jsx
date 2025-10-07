@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import aiService from '../services/aiService';
 import './DailyReflectionChat.css';
 
@@ -8,6 +8,8 @@ const DailyReflectionChat = ({ onComplete, userContext, apiKey }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [reflectionComplete, setReflectionComplete] = useState(false);
   const [reflectionData, setReflectionData] = useState({});
+  const inputRef = useRef(null);
+  const [questionCount, setQuestionCount] = useState(0);
 
   // Start the reflection with LOA's first message
   useEffect(() => {
@@ -63,6 +65,11 @@ const DailyReflectionChat = ({ onComplete, userContext, apiKey }) => {
       }
 
       setMessages([...newMessages, { sender: 'LOA', text: aiResponse }]);
+      
+      // Increment question count when LOA asks a question
+      if (aiResponse.includes('?')) {
+        setQuestionCount(prev => prev + 1);
+      }
     } catch (error) {
       console.error('Error in reflection:', error);
       setMessages([...newMessages, { 
@@ -71,40 +78,42 @@ const DailyReflectionChat = ({ onComplete, userContext, apiKey }) => {
       }]);
     } finally {
       setIsLoading(false);
+      // Auto-focus input after LOA responds
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     }
   };
 
   const completeReflection = () => {
-    // Save reflection data and generate daily playbook
-    const reflectionSummary = {
-      timestamp: new Date().toISOString(),
-      messages: messages,
-      completed: true
-    };
+    // Add a completion message before closing
+    setMessages(prev => [...prev, {
+      sender: 'LOA',
+      text: '🎉 You completed your daily reflection! Great job taking time for yourself. Generating your personalized playbook now...'
+    }]);
     
-    onComplete(reflectionSummary);
+    // Save reflection data and generate daily playbook
+    setTimeout(() => {
+      const reflectionSummary = {
+        timestamp: new Date().toISOString(),
+        messages: messages,
+        completed: true
+      };
+      
+      onComplete(reflectionSummary);
+    }, 1500); // Small delay to show completion message
   };
 
   const handleClose = () => {
-    if (messages.length > 1) {
-      // If there's conversation progress, confirm before closing
-      if (window.confirm('Are you sure you want to exit? Your progress will be lost.')) {
-        onComplete({
-          timestamp: new Date().toISOString(),
-          messages: messages,
-          completed: false,
-          cancelled: true
-        });
-      }
-    } else {
-      // If just started, close immediately
-      onComplete({
-        timestamp: new Date().toISOString(),
-        messages: messages,
-        completed: false,
-        cancelled: true
-      });
-    }
+    // Save progress regardless of how far the user got
+    // This allows them to resume or at least keeps their data
+    onComplete({
+      timestamp: new Date().toISOString(),
+      messages: messages,
+      completed: false,
+      cancelled: true,
+      partialProgress: messages.length > 1 // Flag to indicate there was some progress
+    });
   };
 
   return (
@@ -116,7 +125,13 @@ const DailyReflectionChat = ({ onComplete, userContext, apiKey }) => {
             ✕
           </button>
           <h2>Daily Reflection</h2>
-          <p className="reflection-subtitle">Let's create your perfect day together</p>
+          <p className="reflection-subtitle">
+            {!reflectionComplete && questionCount > 0 && questionCount < 5 && (
+              <span className="progress-indicator">Question {questionCount} of ~4-5</span>
+            )}
+            {reflectionComplete && <span className="progress-complete">✓ Complete</span>}
+            {questionCount === 0 && "Let's create your perfect day together"}
+          </p>
         </div>
 
         <div className="reflection-chat">
@@ -140,6 +155,7 @@ const DailyReflectionChat = ({ onComplete, userContext, apiKey }) => {
           <div className="reflection-input">
             <div className="input-row">
               <input
+                ref={inputRef}
                 type="text"
                 value={currentMessage}
                 onChange={(e) => setCurrentMessage(e.target.value)}
