@@ -45,8 +45,8 @@ const AwakeDashboard = () => {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   // API Key: Use environment variable for premium users, or localStorage for manual override
-  const envApiKey = import.meta.env.VITE_CLAUDE_API_KEY;
-  const [apiKey, setApiKey] = useState(localStorage.getItem('claude_api_key') || envApiKey || '');
+  // API key from environment variable (for premium users only)
+  const apiKey = import.meta.env.VITE_CLAUDE_API_KEY || '';
   const [chatMessages, setChatMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -1334,26 +1334,6 @@ const AwakeDashboard = () => {
         />
 
       </div>
-
-      {/* API Key Modal */}
-      {showApiKeyModal && (
-        <div className="modal-backdrop">
-          <div className="modal-content">
-            <h3>AI Setup</h3>
-            <p>Add your Claude API key:</p>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-ant-api03-..."
-            />
-            <div className="modal-actions">
-              <button onClick={() => setShowApiKeyModal(false)}>Save</button>
-              <button onClick={() => setShowApiKeyModal(false)}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Daily Reflection Modal */}
       {showReflection && (
