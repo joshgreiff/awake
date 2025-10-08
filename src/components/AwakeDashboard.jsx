@@ -24,7 +24,8 @@ const AwakeDashboard = () => {
   const [dailyPlaybook, setDailyPlaybook] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [vision, setVision] = useState('');
-  const [profile, setProfile] = useState({ name: '', gender: 'other' });
+  const [profile, setProfile] = useState({ name: '', gender: 'other', avatarUrl: '' });
+  const [showAvatarCreator, setShowAvatarCreator] = useState(false);
 
   // Premium whitelist (beta testers)
   const BETA_PREMIUM_USERNAMES = [
@@ -205,6 +206,25 @@ const AwakeDashboard = () => {
       loadChatHistory();
     }
   }, [isAuthenticated, currentUserId]);
+
+  // Listen for Ready Player Me avatar selection
+  useEffect(() => {
+    const handleAvatarMessage = (event) => {
+      if (event.origin !== 'https://demo.readyplayer.me') return;
+      
+      if (event.data?.source === 'readyplayerme') {
+        const avatarUrl = event.data.data.url;
+        if (avatarUrl) {
+          setProfile(prev => ({ ...prev, avatarUrl }));
+          setShowAvatarCreator(false);
+          saveUserData({ curiosities, attributes, needs, vision, profile: { ...profile, avatarUrl }, dailyPlaybook });
+        }
+      }
+    };
+
+    window.addEventListener('message', handleAvatarMessage);
+    return () => window.removeEventListener('message', handleAvatarMessage);
+  }, [profile, curiosities, attributes, needs, vision, dailyPlaybook]);
   
   const loadChatHistory = () => {
     const historyKey = `awake-chat-history-${currentUserId}`;
@@ -970,10 +990,18 @@ const AwakeDashboard = () => {
       {/* Header */}
       <div className="dashboard-header">
         <div className="user-section">
-          <h1>Awake Dashboard</h1>
-          <p className="user-stats">
-            {userInfo?.username || profile.name || 'User'} | Level: {character.level} | Tokens: {Math.floor(character.xp / 10)}
-          </p>
+          {profile.avatarUrl && (
+            <div className="header-avatar">
+              <img src={profile.avatarUrl} alt="Avatar" />
+              <span className="avatar-level">Lv {character.level}</span>
+            </div>
+          )}
+          <div className="user-info">
+            <h1>Awake Dashboard</h1>
+            <p className="user-stats">
+              {userInfo?.username || profile.name || 'User'} | Level: {character.level} | Tokens: {Math.floor(character.xp / 10)}
+            </p>
+          </div>
         </div>
         <div className="header-actions">
           <button className="reflection-btn" onClick={startDailyReflection}>
@@ -1561,6 +1589,23 @@ const AwakeDashboard = () => {
         </div>
       )}
 
+      {/* Ready Player Me Avatar Creator */}
+      {showAvatarCreator && (
+        <div className="modal-overlay" onClick={() => setShowAvatarCreator(false)}>
+          <div className="modal-content avatar-creator-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>✨ Create Your Avatar</h2>
+              <button className="close-btn" onClick={() => setShowAvatarCreator(false)}>×</button>
+            </div>
+            <iframe
+              src="https://demo.readyplayer.me/avatar?frameApi"
+              className="avatar-creator-iframe"
+              allow="camera *; microphone *"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Profile Modal */}
       {showProfileModal && (
         <div className="modal-overlay" onClick={() => setShowProfileModal(false)}>
@@ -1574,6 +1619,34 @@ const AwakeDashboard = () => {
               <p className="modal-description">
                 Set your name and gender so LOA can personalize your vision and conversations.
               </p>
+
+              {/* Avatar Section */}
+              <div className="avatar-section">
+                <label>Avatar</label>
+                <div className="avatar-display">
+                  {profile.avatarUrl ? (
+                    <div className="avatar-preview">
+                      <img 
+                        src={profile.avatarUrl} 
+                        alt="Your avatar"
+                        className="avatar-image"
+                      />
+                      <div className="character-level-badge">Lv {character.level}</div>
+                    </div>
+                  ) : (
+                    <div className="avatar-placeholder">
+                      <span className="placeholder-icon">👤</span>
+                      <p>No avatar yet</p>
+                    </div>
+                  )}
+                  <button 
+                    className="create-avatar-btn"
+                    onClick={() => setShowAvatarCreator(true)}
+                  >
+                    {profile.avatarUrl ? '✏️ Edit Avatar' : '✨ Create Avatar'}
+                  </button>
+                </div>
+              </div>
 
               <div className="profile-form">
                 <div className="form-group">
