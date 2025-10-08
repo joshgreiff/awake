@@ -107,21 +107,34 @@ export const TRAIT_SUGGESTIONS = [
  */
 export function getTraitColor(traitName) {
   const colors = {
-    'Creativity': '#9b59b6',
-    'Discipline': '#e74c3c',
-    'Communication': '#3498db',
-    'Focus': '#2ecc71',
-    'Fitness': '#16a085',
-    'Curiosity': '#f39c12',
-    'Empathy': '#e91e63',
-    'Resilience': '#795548',
-    'Courage': '#ff5722',
-    'Mindfulness': '#00bcd4',
-    'Leadership': '#ffc107',
-    'Organization': '#607d8b'
+    'Creativity': '#9b59b6',      // Purple
+    'Discipline': '#e74c3c',      // Red
+    'Communication': '#3498db',   // Blue
+    'Focus': '#2ecc71',           // Green
+    'Fitness': '#16a085',         // Teal
+    'Curiosity': '#f39c12',       // Orange
+    'Empathy': '#e91e63',         // Pink
+    'Resilience': '#795548',      // Brown
+    'Courage': '#ff5722',         // Deep Orange
+    'Mindfulness': '#00bcd4',     // Cyan
+    'Leadership': '#ffc107',      // Amber
+    'Organization': '#607d8b',    // Blue Grey
+    'Consistency': '#8e44ad',     // Dark Purple
+    'Learning': '#27ae60',        // Dark Green
+    'Patience': '#1abc9c',        // Turquoise
+    'Confidence': '#f1c40f',      // Yellow
+    'Gratitude': '#e67e22',       // Carrot Orange
+    'Authenticity': '#9c27b0'     // Deep Purple
   };
   
-  return colors[traitName] || '#667eea';
+  // Generate a consistent color for custom traits based on name
+  if (!colors[traitName]) {
+    const hash = traitName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const hue = hash % 360;
+    return `hsl(${hue}, 65%, 55%)`;
+  }
+  
+  return colors[traitName];
 }
 
 /**

@@ -26,10 +26,27 @@ const AwakeDashboard = () => {
   const [vision, setVision] = useState('');
   const [profile, setProfile] = useState({ name: '', gender: 'other' });
 
+  // Premium whitelist (beta testers)
+  const BETA_PREMIUM_USERNAMES = [
+    'josh',
+    'sayer',
+    'aurora',
+    // Add beta tester usernames here
+  ];
+  
   // UI state
-  const [apiKey, setApiKey] = useState(localStorage.getItem('claude_api_key') || '');
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [isPremium, setIsPremium] = useState(() => {
+    // Check if user is in beta whitelist OR has manual premium toggle
+    const manualPremium = localStorage.getItem('awake_premium') === 'true';
+    const username = userInfo?.username?.toLowerCase();
+    const isWhitelisted = username && BETA_PREMIUM_USERNAMES.includes(username);
+    return manualPremium || isWhitelisted;
+  });
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  // API Key: Use environment variable for premium users, or localStorage for manual override
+  const envApiKey = import.meta.env.VITE_CLAUDE_API_KEY;
+  const [apiKey, setApiKey] = useState(localStorage.getItem('claude_api_key') || envApiKey || '');
   const [chatMessages, setChatMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -49,6 +66,9 @@ const AwakeDashboard = () => {
   const [reflectionHistory, setReflectionHistory] = useState([]);
   const [reflectionStreak, setReflectionStreak] = useState(0);
   const [lastReflectionDate, setLastReflectionDate] = useState(null);
+  
+  // Usage tracking
+  const [dailyUsage, setDailyUsage] = useState({ messages: 0, date: new Date().toISOString().split('T')[0] });
 
   // Trait customization state
   const [showTraitModal, setShowTraitModal] = useState(false);
@@ -81,6 +101,13 @@ const AwakeDashboard = () => {
         setCurrentUserId(user.id);
         setUserInfo(user);
         setIsAuthenticated(true);
+        
+        // Check if user is in premium whitelist
+        const isWhitelisted = BETA_PREMIUM_USERNAMES.includes(user.username?.toLowerCase());
+        if (isWhitelisted) {
+          setIsPremium(true);
+          console.log(`✨ ${user.username} is whitelisted for premium beta access`);
+        }
         
         // Load user data
         loadUserData(user.id);
@@ -206,6 +233,19 @@ const AwakeDashboard = () => {
       setChatMessages(chat.messages || []);
     }
   };
+  
+  const deleteChat = (chatId, e) => {
+    e.stopPropagation(); // Prevent loading the chat when clicking delete
+    if (window.confirm('Delete this conversation?')) {
+      const updatedHistory = chatHistory.filter(c => c.id !== chatId);
+      saveChatHistory(updatedHistory);
+      
+      // If we deleted the current chat, start a new one
+      if (currentChatId === chatId) {
+        startNewChat();
+      }
+    }
+  };
 
   // Auto-save dailyPlaybook whenever it changes
   useEffect(() => {
@@ -286,6 +326,17 @@ const AwakeDashboard = () => {
           setReflectionStreak(streakData.count || 0);
           setLastReflectionDate(streakData.lastDate);
         }
+        
+        // Load usage data
+        const today = new Date().toISOString().split('T')[0];
+        const savedUsage = data.dailyUsage || { messages: 0, date: today };
+        
+        // Reset if it's a new day
+        if (savedUsage.date !== today) {
+          setDailyUsage({ messages: 0, date: today });
+        } else {
+          setDailyUsage(savedUsage);
+        }
       } catch (e) {
         console.error('Error loading user data:', e);
         // Fall through to defaults
@@ -338,8 +389,32 @@ const AwakeDashboard = () => {
       reflectionStreak: {
         count: reflectionStreak,
         lastDate: lastReflectionDate
-      }
+      },
+      dailyUsage
     }));
+  };
+  
+  const checkRateLimit = () => {
+    const DAILY_MESSAGE_LIMIT = 50; // Beta limit
+    
+    if (dailyUsage.messages >= DAILY_MESSAGE_LIMIT) {
+      alert(`You've reached your daily limit of ${DAILY_MESSAGE_LIMIT} AI messages. Your limit resets tomorrow!`);
+      return false;
+    }
+    return true;
+  };
+  
+  const incrementUsage = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const newUsage = {
+      messages: dailyUsage.date === today ? dailyUsage.messages + 1 : 1,
+      date: today
+    };
+    setDailyUsage(newUsage);
+    saveUserData({ curiosities, attributes, needs, vision, profile, dailyPlaybook, dailyUsage: newUsage });
+    
+    // Log to console for monitoring
+    console.log(`AI Usage: ${newUsage.messages} messages today`);
   };
 
   const generateDailyPlaybook = () => {
@@ -514,6 +589,10 @@ const AwakeDashboard = () => {
 
   // Daily Reflection handlers
   const startDailyReflection = () => {
+    if (!isPremium && !apiKey) {
+      setShowUpgradeModal(true);
+      return;
+    }
     setShowReflection(true);
   };
 
@@ -637,6 +716,19 @@ const AwakeDashboard = () => {
   const sendMessage = async (messageText = currentMessage) => {
     if (!messageText.trim()) return;
     
+    // Check for premium access
+    if (!isPremium && !apiKey) {
+      setShowUpgradeModal(true);
+      setCurrentMessage('');
+      return;
+    }
+    
+    // Check rate limit
+    if (!checkRateLimit()) {
+      setCurrentMessage('');
+      return;
+    }
+    
     // Start a new chat if none exists
     if (!currentChatId) {
       startNewChat();
@@ -652,8 +744,8 @@ const AwakeDashboard = () => {
       const userContext = { curiosities, attributes, needs, dailyPlaybook, vision, profile };
 
       let aiResponse;
-      if (!apiKey) {
-        aiResponse = "I'd love to provide personalized coaching, but I need a Claude API key first. Click the settings button to add your key!";
+      if (!isPremium && !apiKey) {
+        aiResponse = "AI features are only available with Premium. Upgrade to unlock personalized coaching!";
       } else {
         aiResponse = await aiService.sendMessage(messageText, userContext, chatMessages);
         
@@ -669,6 +761,9 @@ const AwakeDashboard = () => {
 
       const finalMessages = [...newMessages, { sender: 'LOA', text: aiResponse, timestamp: Date.now() }];
       setChatMessages(finalMessages);
+      
+      // Track usage
+      incrementUsage();
       
       // Save chat to history
       const updatedHistory = [...chatHistory];
@@ -853,15 +948,17 @@ const AwakeDashboard = () => {
           >
             👥 Community
           </button>
+          {!isPremium && (
+            <button className="upgrade-btn" onClick={() => setShowUpgradeModal(true)}>
+              ✨ Upgrade to Premium
+            </button>
+          )}
+          {isPremium && (
+            <span className="premium-badge" title="Premium Member">💎 Premium</span>
+          )}
           <button className="profile-btn" onClick={() => setShowProfileModal(true)} title="Edit Profile">
             👤
           </button>
-          {!apiKey && (
-            <button className="setup-ai-btn" onClick={() => setShowApiKeyModal(true)}>
-              🤖 Setup AI
-            </button>
-          )}
-          <button className="settings-btn" onClick={() => setShowApiKeyModal(true)}>⚙️</button>
         </div>
       </div>
 
@@ -1073,7 +1170,14 @@ const AwakeDashboard = () => {
         {/* LOA Chat */}
         <div className="dashboard-card chat-card">
           <div className="chat-header-row">
-            <h3>Chat with LOA</h3>
+            <div>
+              <h3>Chat with LOA</h3>
+              {(isPremium || apiKey) && (
+                <p className="usage-counter" title="Daily message limit">
+                  💬 {dailyUsage.messages}/50 today
+                </p>
+              )}
+            </div>
             <button className="new-chat-btn" onClick={startNewChat} title="Start New Chat">
               ➕ New Chat
             </button>
@@ -1089,10 +1193,19 @@ const AwakeDashboard = () => {
                     className={`chat-history-item ${currentChatId === chat.id ? 'active' : ''}`}
                     onClick={() => loadChat(chat.id)}
                   >
-                    <div className="chat-history-title">{chat.title}...</div>
-                    <div className="chat-history-date">
-                      {new Date(chat.lastUpdated).toLocaleDateString()}
+                    <div className="chat-history-info">
+                      <div className="chat-history-title">{chat.title}...</div>
+                      <div className="chat-history-date">
+                        {new Date(chat.lastUpdated).toLocaleDateString()}
+                      </div>
                     </div>
+                    <button 
+                      className="delete-chat-btn"
+                      onClick={(e) => deleteChat(chat.id, e)}
+                      title="Delete chat"
+                    >
+                      🗑️
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1134,7 +1247,15 @@ const AwakeDashboard = () => {
           <div className="chat-messages">
             {chatMessages.map((msg, index) => (
               <div key={index} className={`message ${msg.sender.toLowerCase()}`}>
-                <strong>{msg.sender}:</strong> {msg.text}
+                <strong>{msg.sender}:</strong>
+                <div className="message-content">
+                  {msg.text.split('\n').map((line, i) => (
+                    <span key={i}>
+                      {line}
+                      {i < msg.text.split('\n').length - 1 && <br />}
+                    </span>
+                  ))}
+                </div>
               </div>
             ))}
             {isChatLoading && <div className="message loading">LOA is thinking...</div>}
@@ -1324,6 +1445,80 @@ const AwakeDashboard = () => {
 
             <div className="modal-actions">
               <button className="primary-btn" onClick={() => setShowTraitModal(false)}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade Modal */}
+      {showUpgradeModal && (
+        <div className="modal-overlay" onClick={() => setShowUpgradeModal(false)}>
+          <div className="modal-content upgrade-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>✨ Upgrade to Premium</h2>
+              <button className="close-btn" onClick={() => setShowUpgradeModal(false)}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <p className="upgrade-subtitle">
+                Unlock the full power of Awake with AI-powered personal growth coaching.
+              </p>
+
+              <div className="premium-features">
+                <h3>Premium Features:</h3>
+                <ul>
+                  <li>🤖 <strong>Unlimited AI Chat</strong> - Talk to LOA anytime about anything</li>
+                  <li>📝 <strong>Daily AI Reflection</strong> - Personalized daily planning sessions</li>
+                  <li>🎯 <strong>AI-Generated Playbook</strong> - Custom tasks based on your goals</li>
+                  <li>📊 <strong>Weekly Insights</strong> - AI analyzes your patterns and progress</li>
+                  <li>🔍 <strong>Pattern Detection</strong> - Discover what's working (and what's not)</li>
+                  <li>📸 <strong>Image Upload</strong> - Share screenshots, journal entries, photos</li>
+                  <li>💎 <strong>Premium Community</strong> - Exclusive channels and events</li>
+                </ul>
+
+                <div className="pricing">
+                  <div className="price">$19/month</div>
+                  <p className="price-note">Cancel anytime • 7-day free trial</p>
+                </div>
+              </div>
+
+              {/* Beta Testing Toggle (temporary) */}
+              <div className="beta-toggle">
+                <p style={{fontSize: '0.85rem', color: '#999', fontStyle: 'italic'}}>
+                  Beta Testing: 
+                  <button 
+                    onClick={() => {
+                      const newStatus = !isPremium;
+                      setIsPremium(newStatus);
+                      localStorage.setItem('awake_premium', newStatus.toString());
+                      if (newStatus) {
+                        setShowUpgradeModal(false);
+                      }
+                    }}
+                    style={{marginLeft: '10px', padding: '4px 12px', borderRadius: '4px', border: '1px solid #ccc', cursor: 'pointer'}}
+                  >
+                    {isPremium ? 'Disable Premium' : 'Enable Premium'}
+                  </button>
+                </p>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button 
+                className="premium-upgrade-btn" 
+                onClick={() => {
+                  // TODO: Integrate Stripe/payment processing
+                  alert('Payment integration coming soon! For now, use the beta toggle above.');
+                }}
+              >
+                Start Free Trial
+              </button>
+              <button 
+                className="secondary-btn" 
+                onClick={() => setShowUpgradeModal(false)}
+              >
+                Maybe Later
+              </button>
             </div>
           </div>
         </div>

@@ -101,6 +101,45 @@
   box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
 }
 
+.upgrade-btn {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  color: #333;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.upgrade-btn:hover {
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
+  animation: none;
+}
+
+.premium-badge {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  color: #333;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+}
+
 .setup-ai-btn {
   background: linear-gradient(135deg, #7F5AF0, #2CB67D);
   color: white;
@@ -625,6 +664,13 @@
   margin-bottom: 15px;
 }
 
+.usage-counter {
+  font-size: 0.85rem;
+  color: #999;
+  margin: 5px 0 0 0;
+  font-weight: 500;
+}
+
 .new-chat-btn {
   background: linear-gradient(135deg, #7F5AF0, #2CB67D);
   color: white;
@@ -674,6 +720,10 @@
   transition: background 0.2s;
   border: 1px solid #e0e0e0;
   background: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
 
 .chat-history-item:hover {
@@ -683,6 +733,11 @@
 .chat-history-item.active {
   background: rgba(102, 126, 234, 0.2);
   border-color: #667eea;
+}
+
+.chat-history-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .chat-history-title {
@@ -699,6 +754,22 @@
   color: #999;
 }
 
+.delete-chat-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s, transform 0.2s;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.delete-chat-btn:hover {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
 .chat-messages {
   min-height: 350px;
   max-height: 500px;
@@ -712,10 +783,16 @@
 
 .message {
   margin-bottom: 12px;
-  padding: 8px 12px;
+  padding: 12px 16px;
   border-radius: 8px;
-  line-height: 1.4;
+  line-height: 1.6;
   color: #333;
+}
+
+.message-content {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  line-height: 1.7;
 }
 
 .message.loa {
@@ -952,6 +1029,99 @@
   max-width: 500px;
   width: 90vw;
   box-sizing: border-box;
+}
+
+.upgrade-modal {
+  max-width: 600px;
+}
+
+.upgrade-subtitle {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.premium-features {
+  margin: 20px 0;
+}
+
+.premium-features h3 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.premium-features ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 25px 0;
+}
+
+.premium-features li {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.premium-features li:last-child {
+  border-bottom: none;
+}
+
+.pricing {
+  text-align: center;
+  padding: 25px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  color: white;
+  margin: 25px 0;
+}
+
+.price {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.price-note {
+  font-size: 0.9rem;
+  opacity: 0.9;
+  margin: 0;
+}
+
+.premium-upgrade-btn {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  color: #333;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1.1rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.premium-upgrade-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+}
+
+.secondary-btn {
+  background: transparent;
+  color: #666;
+  border: 1px solid #ddd;
+  padding: 12px 28px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+  width: 100%;
+}
+
+.secondary-btn:hover {
+  background: #f5f5f5;
 }
 
 .modal-content h3 {

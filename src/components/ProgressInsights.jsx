@@ -84,11 +84,32 @@ const ProgressInsights = ({ userId, needs, attributes, curiosities }) => {
       return needColors[name] || `hsl(${index * 60}, 70%, 60%)`;
     }
     
-    // Curiosity colors - vibrant palette
+    // Curiosity colors - expanded, distinct palette (24 colors)
     const curiosityColors = [
-      '#FF6B6B', '#4ECDC4', '#FFE66D', '#A8E6CF',
-      '#FF8B94', '#95E1D3', '#F38181', '#AA96DA',
-      '#FCBAD3', '#FFFFD2', '#A8DADC', '#F1C0E8'
+      '#FF6B6B', // Red
+      '#4ECDC4', // Teal
+      '#FFE66D', // Yellow
+      '#A8E6CF', // Mint
+      '#AA96DA', // Purple
+      '#FF8B94', // Pink
+      '#95E1D3', // Aqua
+      '#F38181', // Coral
+      '#FCBAD3', // Light Pink
+      '#A8DADC', // Sky Blue
+      '#F1C0E8', // Lavender
+      '#FF9F1C', // Orange
+      '#2EC4B6', // Turquoise
+      '#E71D36', // Crimson
+      '#5FA8D3', // Blue
+      '#8AC926', // Lime Green
+      '#FF495C', // Red-Pink
+      '#6A4C93', // Deep Purple
+      '#1982C4', // Ocean Blue
+      '#FFCA3A', // Golden Yellow
+      '#C9ADA7', // Dusty Rose
+      '#52B788', // Green
+      '#FF7B9C', // Bubblegum
+      '#4A5859'  // Charcoal
     ];
     return curiosityColors[index % curiosityColors.length];
   };
