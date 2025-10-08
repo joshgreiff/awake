@@ -33,6 +33,15 @@ const AwakeDashboard = () => {
     'aurora',
     // Add beta tester usernames here
   ];
+
+  // Valid promo codes (can be shared with beta testers)
+  const VALID_PROMO_CODES = [
+    'BETA2025',
+    'EARLYACCESS',
+    'AWAKEN',
+    'FOUNDER',
+    // Add more promo codes here
+  ];
   
   // UI state
   const [isPremium, setIsPremium] = useState(() => {
@@ -44,6 +53,8 @@ const AwakeDashboard = () => {
   });
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoError, setPromoError] = useState('');
   // API Key: Use environment variable for premium users, or localStorage for manual override
   // API key from environment variable (for premium users only)
   const apiKey = import.meta.env.VITE_CLAUDE_API_KEY || '';
@@ -415,6 +426,33 @@ const AwakeDashboard = () => {
     
     // Log to console for monitoring
     console.log(`AI Usage: ${newUsage.messages} messages today`);
+  };
+
+  const handlePromoCode = () => {
+    const code = promoCode.trim().toUpperCase();
+    
+    if (!code) {
+      setPromoError('Please enter a promo code');
+      return;
+    }
+    
+    if (VALID_PROMO_CODES.includes(code)) {
+      // Valid code! Grant premium access
+      localStorage.setItem('awake_premium', 'true');
+      localStorage.setItem('awake_promo_code', code); // Track which code was used
+      setIsPremium(true);
+      setShowUpgradeModal(false);
+      setPromoCode('');
+      setPromoError('');
+      
+      // Show success message
+      setChatMessages([{ 
+        sender: 'LOA', 
+        text: '🎉 Welcome to Premium! You now have full access to all AI features. Let\'s make magic happen!' 
+      }]);
+    } else {
+      setPromoError('Invalid promo code. Please check and try again.');
+    }
   };
 
   const generateDailyPlaybook = () => {
@@ -1462,23 +1500,42 @@ const AwakeDashboard = () => {
                 </div>
               </div>
 
-              {/* Beta Testing Toggle (temporary) */}
-              <div className="beta-toggle">
-                <p style={{fontSize: '0.85rem', color: '#999', fontStyle: 'italic'}}>
-                  Beta Testing: 
-                  <button 
-                    onClick={() => {
-                      const newStatus = !isPremium;
-                      setIsPremium(newStatus);
-                      localStorage.setItem('awake_premium', newStatus.toString());
-                      if (newStatus) {
-                        setShowUpgradeModal(false);
+              {/* Promo Code Section */}
+              <div className="promo-code-section">
+                <div className="divider">
+                  <span>or</span>
+                </div>
+                <p style={{fontSize: '0.9rem', color: '#666', marginBottom: '10px', textAlign: 'center'}}>
+                  Have a promo code?
+                </p>
+                <div className="promo-input-group">
+                  <input
+                    type="text"
+                    value={promoCode}
+                    onChange={(e) => {
+                      setPromoCode(e.target.value);
+                      setPromoError('');
+                    }}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handlePromoCode();
                       }
                     }}
-                    style={{marginLeft: '10px', padding: '4px 12px', borderRadius: '4px', border: '1px solid #ccc', cursor: 'pointer'}}
+                    placeholder="Enter promo code"
+                    className="promo-input"
+                  />
+                  <button 
+                    onClick={handlePromoCode}
+                    className="promo-submit-btn"
                   >
-                    {isPremium ? 'Disable Premium' : 'Enable Premium'}
+                    Apply
                   </button>
+                </div>
+                {promoError && (
+                  <p className="promo-error">{promoError}</p>
+                )}
+                <p style={{fontSize: '0.75rem', color: '#999', fontStyle: 'italic', marginTop: '10px', textAlign: 'center'}}>
+                  Codes: BETA2025, EARLYACCESS, AWAKEN, FOUNDER
                 </p>
               </div>
             </div>
@@ -1488,7 +1545,7 @@ const AwakeDashboard = () => {
                 className="premium-upgrade-btn" 
                 onClick={() => {
                   // TODO: Integrate Stripe/payment processing
-                  alert('Payment integration coming soon! For now, use the beta toggle above.');
+                  alert('Payment processing coming soon! Use a promo code for early access.');
                 }}
               >
                 Start Free Trial
