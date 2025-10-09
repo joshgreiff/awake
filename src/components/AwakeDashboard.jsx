@@ -210,15 +210,31 @@ const AwakeDashboard = () => {
   // Listen for Ready Player Me avatar selection
   useEffect(() => {
     const handleAvatarMessage = (event) => {
+      // Accept messages from Ready Player Me
       if (event.origin !== 'https://demo.readyplayer.me') return;
       
+      console.log('Received message from Ready Player Me:', event.data);
+      
       if (event.data?.source === 'readyplayerme') {
-        const avatarUrl = event.data.data.url;
-        if (avatarUrl) {
-          setProfile(prev => ({ ...prev, avatarUrl }));
-          setShowAvatarCreator(false);
-          setShowProfileModal(true); // Reopen profile to show new avatar
-          saveUserData({ curiosities, attributes, needs, vision, profile: { ...profile, avatarUrl }, dailyPlaybook });
+        const eventName = event.data?.eventName;
+        
+        // Avatar export complete
+        if (eventName === 'v1.avatar.exported') {
+          const avatarUrl = event.data?.data?.url;
+          console.log('Avatar exported:', avatarUrl);
+          
+          if (avatarUrl) {
+            setProfile(prev => ({ ...prev, avatarUrl }));
+            setShowAvatarCreator(false);
+            setShowProfileModal(true); // Reopen profile to show new avatar
+            saveUserData({ curiosities, attributes, needs, vision, profile: { ...profile, avatarUrl }, dailyPlaybook });
+            
+            // Show success message
+            setChatMessages([{ 
+              sender: 'LOA', 
+              text: '✨ Your avatar has been created! Looking great!' 
+            }]);
+          }
         }
       }
     };
@@ -1598,10 +1614,14 @@ const AwakeDashboard = () => {
               <h2>✨ Create Your Avatar</h2>
               <button className="close-btn" onClick={() => setShowAvatarCreator(false)}>×</button>
             </div>
+            <div className="avatar-instructions">
+              <p>💡 When you're done customizing, your avatar will save automatically!</p>
+            </div>
             <iframe
-              src="https://demo.readyplayer.me/avatar?frameApi"
+              src="https://demo.readyplayer.me/avatar?frameApi&clearCache"
               className="avatar-creator-iframe"
               allow="camera *; microphone *"
+              title="Avatar Creator"
             />
           </div>
         </div>
