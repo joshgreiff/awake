@@ -217,6 +217,7 @@ const AwakeDashboard = () => {
         if (avatarUrl) {
           setProfile(prev => ({ ...prev, avatarUrl }));
           setShowAvatarCreator(false);
+          setShowProfileModal(true); // Reopen profile to show new avatar
           saveUserData({ curiosities, attributes, needs, vision, profile: { ...profile, avatarUrl }, dailyPlaybook });
         }
       }
@@ -1641,7 +1642,10 @@ const AwakeDashboard = () => {
                   )}
                   <button 
                     className="create-avatar-btn"
-                    onClick={() => setShowAvatarCreator(true)}
+                    onClick={() => {
+                      setShowAvatarCreator(true);
+                      setShowProfileModal(false);
+                    }}
                   >
                     {profile.avatarUrl ? '✏️ Edit Avatar' : '✨ Create Avatar'}
                   </button>
