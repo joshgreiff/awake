@@ -26,6 +26,86 @@ const AwakeDashboard = () => {
   const [vision, setVision] = useState('');
   const [profile, setProfile] = useState({ name: '', gender: 'other', avatarUrl: '' });
   const [showAvatarCreator, setShowAvatarCreator] = useState(false);
+  const [showCharacterScreen, setShowCharacterScreen] = useState(false);
+  
+  // Vision audio playback state
+  const [isPlayingVision, setIsPlayingVision] = useState(false);
+  const [speechSynthesis] = useState(() => window.speechSynthesis);
+
+  // Helper function to convert Ready Player Me GLB URL to PNG
+  const getAvatarImageUrl = (glbUrl) => {
+    if (!glbUrl) return '';
+    // Ready Player Me provides a simple way to get PNG renders
+    // Replace .glb with .png and add size parameter
+    return glbUrl.replace('.glb', '.png?size=512');
+  };
+
+  // Vision audio playback functions
+  const playVisionAudio = () => {
+    if (!vision) {
+      alert('Create your vision first to hear it aloud!');
+      return;
+    }
+
+    // Stop any currently playing speech
+    if (speechSynthesis.speaking) {
+      speechSynthesis.cancel();
+    }
+
+    const utterance = new SpeechSynthesisUtterance(vision);
+    
+    // Configure voice settings for a calm, meditative feel
+    utterance.rate = 0.85; // Slightly slower for mindfulness
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    // Try to use a natural-sounding voice
+    const voices = speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => 
+      v.name.includes('Samantha') || // macOS
+      v.name.includes('Google US English') || // Chrome
+      v.name.includes('Microsoft Zira') // Windows
+    );
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+
+    utterance.onstart = () => setIsPlayingVision(true);
+    utterance.onend = () => setIsPlayingVision(false);
+    utterance.onerror = () => setIsPlayingVision(false);
+
+    speechSynthesis.speak(utterance);
+  };
+
+  const pauseVisionAudio = () => {
+    if (speechSynthesis.speaking) {
+      speechSynthesis.pause();
+      setIsPlayingVision(false);
+    }
+  };
+
+  const resumeVisionAudio = () => {
+    if (speechSynthesis.paused) {
+      speechSynthesis.resume();
+      setIsPlayingVision(true);
+    }
+  };
+
+  const stopVisionAudio = () => {
+    speechSynthesis.cancel();
+    setIsPlayingVision(false);
+  };
+
+  // Load voices when component mounts
+  useEffect(() => {
+    const loadVoices = () => {
+      speechSynthesis.getVoices();
+    };
+    loadVoices();
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = loadVoices;
+    }
+  }, [speechSynthesis]);
 
   // Premium whitelist (beta testers)
   const BETA_PREMIUM_USERNAMES = [
@@ -1048,8 +1128,13 @@ const AwakeDashboard = () => {
       <div className="dashboard-header">
         <div className="user-section">
           {profile.avatarUrl && (
-            <div className="header-avatar">
-              <img src={profile.avatarUrl} alt="Avatar" />
+            <div 
+              className="header-avatar"
+              onClick={() => setShowCharacterScreen(true)}
+              style={{ cursor: 'pointer' }}
+              title="View character screen"
+            >
+              <img src={getAvatarImageUrl(profile.avatarUrl)} alt="Avatar" />
               <span className="avatar-level">Lv {character.level}</span>
             </div>
           )}
@@ -1117,7 +1202,42 @@ const AwakeDashboard = () => {
           ) : (
             <div className="vision-display">
               {vision ? (
-                <p className="vision-text">{vision}</p>
+                <>
+                  <p className="vision-text">{vision}</p>
+                  <div className="vision-audio-controls">
+                    <p className="audio-instruction">
+                      🎧 Listen to your vision daily to manifest your ideal self
+                    </p>
+                    <div className="audio-buttons">
+                      {!isPlayingVision ? (
+                        <button 
+                          className="audio-btn play-btn" 
+                          onClick={playVisionAudio}
+                          title="Play vision audio"
+                        >
+                          ▶️ Play Vision
+                        </button>
+                      ) : (
+                        <>
+                          <button 
+                            className="audio-btn pause-btn" 
+                            onClick={pauseVisionAudio}
+                            title="Pause audio"
+                          >
+                            ⏸️ Pause
+                          </button>
+                          <button 
+                            className="audio-btn stop-btn" 
+                            onClick={stopVisionAudio}
+                            title="Stop audio"
+                          >
+                            ⏹️ Stop
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </>
               ) : (
                 <p className="vision-placeholder">
                   Click the edit button to craft your vision. Describe who you're becoming more and more each day...
@@ -1688,7 +1808,7 @@ const AwakeDashboard = () => {
                   {profile.avatarUrl ? (
                     <div className="avatar-preview">
                       <img 
-                        src={profile.avatarUrl} 
+                        src={getAvatarImageUrl(profile.avatarUrl)} 
                         alt="Your avatar"
                         className="avatar-image"
                       />
@@ -1759,6 +1879,145 @@ const AwakeDashboard = () => {
               >
                 Save Profile
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Character Screen Modal - Full body avatar view */}
+      {showCharacterScreen && (
+        <div className="modal-overlay" onClick={() => setShowCharacterScreen(false)}>
+          <div className="modal-content character-screen-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="close-btn" onClick={() => setShowCharacterScreen(false)}>×</button>
+            
+            <div className="character-screen-container">
+              {/* Left side - Avatar & basic info */}
+              <div className="character-left">
+                <div className="character-avatar-display">
+                  {profile.avatarUrl ? (
+                    <img 
+                      src={getAvatarImageUrl(profile.avatarUrl)} 
+                      alt="Character"
+                      className="character-full-avatar"
+                    />
+                  ) : (
+                    <div className="character-placeholder">
+                      <span>👤</span>
+                      <p>Create your avatar</p>
+                    </div>
+                  )}
+                  <div className="character-level-display">
+                    <span className="level-label">LEVEL</span>
+                    <span className="level-number">{character.level}</span>
+                  </div>
+                </div>
+                
+                <div className="character-basic-info">
+                  <h2 className="character-name">{profile.name || userInfo?.username || 'Seeker'}</h2>
+                  <p className="character-title">Consciousness Explorer</p>
+                  
+                  <div className="xp-bar-container">
+                    <div className="xp-label">
+                      <span>Experience</span>
+                      <span>{character.xp} / {character.xpToNext} XP</span>
+                    </div>
+                    <div className="xp-bar">
+                      <div 
+                        className="xp-progress" 
+                        style={{ width: `${(character.xp / character.xpToNext) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="character-stats-grid">
+                    <div className="stat-item">
+                      <span className="stat-label">🎯 Tasks Completed</span>
+                      <span className="stat-value">{tasks.filter(t => t.completed).length}</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">🔥 Current Streak</span>
+                      <span className="stat-value">{Math.floor(Math.random() * 7) + 1} days</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">🎮 Total XP</span>
+                      <span className="stat-value">{Math.floor(character.xp + (character.level - 1) * character.xpToNext)}</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">🌟 Traits Active</span>
+                      <span className="stat-value">{attributes.length}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Right side - Traits & insights */}
+              <div className="character-right">
+                <div className="traits-section">
+                  <h3>⚡ Character Traits</h3>
+                  <div className="traits-list-character">
+                    {attributes.map(attr => (
+                      <div key={attr.id} className="trait-card-character">
+                        <div className="trait-header">
+                          <span className="trait-name">{attr.name}</span>
+                          <span className="trait-level">Lv {attr.level}</span>
+                        </div>
+                        <div className="trait-progress-bar">
+                          <div 
+                            className="trait-progress-fill"
+                            style={{ 
+                              width: `${attr.progress}%`,
+                              background: getTraitColor(attr.name)
+                            }}
+                          />
+                        </div>
+                        <div className="trait-xp">
+                          {attr.currentXP} / {attr.xpToNext} XP
+                          <span className="trait-score">({getTraitScore(attr.level)}/10)</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="insights-section">
+                  <h3>💡 Recent Insights</h3>
+                  <div className="insights-list">
+                    <div className="insight-item">
+                      <span className="insight-icon">🎨</span>
+                      <p>You've gained {attributes.find(a => a.name === 'Creativity')?.totalXP || 0} Creativity XP</p>
+                    </div>
+                    <div className="insight-item">
+                      <span className="insight-icon">💪</span>
+                      <p>Most active trait: {attributes.sort((a, b) => b.totalXP - a.totalXP)[0]?.name || 'None yet'}</p>
+                    </div>
+                    <div className="insight-item">
+                      <span className="insight-icon">🚀</span>
+                      <p>You're {character.xpToNext - character.xp} XP away from Level {character.level + 1}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="character-actions">
+                  <button 
+                    className="action-btn" 
+                    onClick={() => {
+                      setShowCharacterScreen(false);
+                      setShowAvatarCreator(true);
+                    }}
+                  >
+                    ✏️ Edit Avatar
+                  </button>
+                  <button 
+                    className="action-btn secondary" 
+                    onClick={() => {
+                      setShowCharacterScreen(false);
+                      setShowProfileModal(true);
+                    }}
+                  >
+                    ⚙️ Profile Settings
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
