@@ -40,6 +40,25 @@ const AwakeDashboard = () => {
     return glbUrl.replace('.glb', '.png?size=512');
   };
 
+  // Extract avatar ID from Ready Player Me URL for editing
+  const getAvatarId = (avatarUrl) => {
+    if (!avatarUrl) return null;
+    // Extract ID from URL like: https://models.readyplayer.me/68e939954640f25eb4c96c7f.glb
+    const match = avatarUrl.match(/\/([a-f0-9]+)\.glb/);
+    return match ? match[1] : null;
+  };
+
+  // Get the correct iframe URL for avatar creation/editing
+  const getAvatarCreatorUrl = () => {
+    const avatarId = getAvatarId(profile.avatarUrl);
+    if (avatarId) {
+      // Edit existing avatar
+      return `https://demo.readyplayer.me/avatar?frameApi&avatarId=${avatarId}`;
+    }
+    // Create new avatar with clearCache
+    return 'https://demo.readyplayer.me/avatar?frameApi&clearCache';
+  };
+
   // Vision audio playback functions
   const playVisionAudio = () => {
     if (!vision) {
@@ -306,23 +325,33 @@ const AwakeDashboard = () => {
         setShowAvatarCreator(false);
         
         // Save to database/localStorage immediately
-        saveUserData({ 
-          curiosities, 
-          attributes, 
-          needs, 
-          vision, 
-          profile: updatedProfile, 
-          dailyPlaybook 
-        });
-        
-        // Show success message
-        setChatMessages(prev => [...prev, { 
-          sender: 'LOA', 
-          text: '✨ Your avatar has been created! Looking great! You can view it in your profile anytime.' 
-        }]);
-        
-        // Optionally reopen profile to show new avatar
-        setTimeout(() => setShowProfileModal(true), 500);
+        try {
+          saveUserData({ 
+            curiosities, 
+            attributes, 
+            needs, 
+            vision, 
+            profile: updatedProfile, 
+            dailyPlaybook 
+          });
+          
+          // Show success message
+          setChatMessages(prev => [...prev, { 
+            sender: 'LOA', 
+            text: profile.avatarUrl 
+              ? '✨ Your avatar has been updated! You look amazing!' 
+              : '✨ Your avatar has been created! Looking great! Click your avatar in the header to see it in 3D.' 
+          }]);
+          
+          // Show character screen after a moment
+          setTimeout(() => setShowCharacterScreen(true), 800);
+        } catch (error) {
+          console.error('Error saving avatar:', error);
+          setChatMessages(prev => [...prev, { 
+            sender: 'LOA', 
+            text: '⚠️ Avatar created but there was an issue saving. Try refreshing the page.' 
+          }]);
+        }
       }
       
       // Also handle structured events (for frame ready, etc.)
@@ -339,21 +368,27 @@ const AwakeDashboard = () => {
             setProfile(updatedProfile);
             setShowAvatarCreator(false);
             
-            saveUserData({ 
-              curiosities, 
-              attributes, 
-              needs, 
-              vision, 
-              profile: updatedProfile, 
-              dailyPlaybook 
-            });
-            
-            setChatMessages(prev => [...prev, { 
-              sender: 'LOA', 
-              text: '✨ Your avatar has been created! Looking great!' 
-            }]);
-            
-            setTimeout(() => setShowProfileModal(true), 500);
+            try {
+              saveUserData({ 
+                curiosities, 
+                attributes, 
+                needs, 
+                vision, 
+                profile: updatedProfile, 
+                dailyPlaybook 
+              });
+              
+              setChatMessages(prev => [...prev, { 
+                sender: 'LOA', 
+                text: profile.avatarUrl 
+                  ? '✨ Your avatar has been updated! You look amazing!' 
+                  : '✨ Your avatar has been created! Click your avatar in the header to see it in 3D.' 
+              }]);
+              
+              setTimeout(() => setShowCharacterScreen(true), 800);
+            } catch (error) {
+              console.error('Error saving avatar:', error);
+            }
           }
         }
       }
@@ -1771,17 +1806,23 @@ const AwakeDashboard = () => {
         <div className="modal-overlay" onClick={() => setShowAvatarCreator(false)}>
           <div className="modal-content avatar-creator-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>✨ Create Your Avatar</h2>
+              <h2>{profile.avatarUrl ? '✏️ Edit Your Avatar' : '✨ Create Your Avatar'}</h2>
               <button className="close-btn" onClick={() => setShowAvatarCreator(false)}>×</button>
             </div>
             <div className="avatar-instructions">
-              <p>💡 When you're done customizing, your avatar will save automatically!</p>
+              <p>💡 {profile.avatarUrl ? 'Make changes and they\'ll save automatically!' : 'When you\'re done customizing, your avatar will save automatically!'}</p>
+              {profile.avatarUrl && (
+                <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '8px' }}>
+                  Tip: If editing isn't working, close this and click "Create Avatar" to start fresh.
+                </p>
+              )}
             </div>
             <iframe
-              src="https://demo.readyplayer.me/avatar?frameApi&clearCache"
+              src={getAvatarCreatorUrl()}
               className="avatar-creator-iframe"
               allow="camera *; microphone *"
               title="Avatar Creator"
+              key={profile.avatarUrl || 'new'} // Force reload when avatar changes
             />
           </div>
         </div>
@@ -1820,15 +1861,31 @@ const AwakeDashboard = () => {
                       <p>No avatar yet</p>
                     </div>
                   )}
-                  <button 
-                    className="create-avatar-btn"
-                    onClick={() => {
-                      setShowAvatarCreator(true);
-                      setShowProfileModal(false);
-                    }}
-                  >
-                    {profile.avatarUrl ? '✏️ Edit Avatar' : '✨ Create Avatar'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button 
+                      className="create-avatar-btn"
+                      onClick={() => {
+                        setShowAvatarCreator(true);
+                        setShowProfileModal(false);
+                      }}
+                    >
+                      {profile.avatarUrl ? '✏️ Edit Avatar' : '✨ Create Avatar'}
+                    </button>
+                    {profile.avatarUrl && (
+                      <button 
+                        className="create-avatar-btn secondary"
+                        onClick={() => {
+                          // Clear avatar to force fresh creation
+                          setProfile({ ...profile, avatarUrl: '' });
+                          setShowAvatarCreator(true);
+                          setShowProfileModal(false);
+                        }}
+                        title="Create a completely new avatar"
+                      >
+                        🔄 Start Fresh
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
