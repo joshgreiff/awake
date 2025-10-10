@@ -1895,11 +1895,34 @@ const AwakeDashboard = () => {
               <div className="character-left">
                 <div className="character-avatar-display">
                   {profile.avatarUrl ? (
-                    <img 
-                      src={getAvatarImageUrl(profile.avatarUrl)} 
-                      alt="Character"
-                      className="character-full-avatar"
-                    />
+                    <model-viewer
+                      src={profile.avatarUrl}
+                      alt="Your 3D Avatar"
+                      className="character-full-avatar model-viewer"
+                      camera-controls
+                      auto-rotate
+                      auto-rotate-delay="1000"
+                      rotation-per-second="30deg"
+                      shadow-intensity="1"
+                      exposure="1"
+                      style={{
+                        width: '100%',
+                        height: '400px',
+                        borderRadius: '15px',
+                        background: 'rgba(255,255,255,0.1)',
+                      }}
+                    >
+                      <div slot="poster" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '100%',
+                        color: 'white',
+                        fontSize: '1.2rem'
+                      }}>
+                        🌀 Loading your avatar...
+                      </div>
+                    </model-viewer>
                   ) : (
                     <div className="character-placeholder">
                       <span>👤</span>
