@@ -32,3 +32,11 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Documentation and planning files (not part of build)
+docs/
+BETA-SAFETY-CHECKLIST.md
+community-assets/
+
+# Keep these docs exceptions if needed
+!docs/README.md

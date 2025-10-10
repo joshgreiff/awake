@@ -215,25 +215,65 @@ const AwakeDashboard = () => {
       
       console.log('Received message from Ready Player Me:', event.data);
       
+      // Check if the message is the avatar URL (sent as a plain string)
+      if (typeof event.data === 'string' && event.data.includes('models.readyplayer.me')) {
+        const avatarUrl = event.data;
+        console.log('✅ Avatar URL received:', avatarUrl);
+        
+        // Update profile with new avatar
+        const updatedProfile = { ...profile, avatarUrl };
+        setProfile(updatedProfile);
+        setShowAvatarCreator(false);
+        
+        // Save to database/localStorage immediately
+        saveUserData({ 
+          curiosities, 
+          attributes, 
+          needs, 
+          vision, 
+          profile: updatedProfile, 
+          dailyPlaybook 
+        });
+        
+        // Show success message
+        setChatMessages(prev => [...prev, { 
+          sender: 'LOA', 
+          text: '✨ Your avatar has been created! Looking great! You can view it in your profile anytime.' 
+        }]);
+        
+        // Optionally reopen profile to show new avatar
+        setTimeout(() => setShowProfileModal(true), 500);
+      }
+      
+      // Also handle structured events (for frame ready, etc.)
       if (event.data?.source === 'readyplayerme') {
         const eventName = event.data?.eventName;
+        console.log('Ready Player Me event:', eventName);
         
-        // Avatar export complete
+        // Handle avatar export event (structured format)
         if (eventName === 'v1.avatar.exported') {
           const avatarUrl = event.data?.data?.url;
-          console.log('Avatar exported:', avatarUrl);
-          
           if (avatarUrl) {
-            setProfile(prev => ({ ...prev, avatarUrl }));
+            console.log('✅ Avatar exported (structured):', avatarUrl);
+            const updatedProfile = { ...profile, avatarUrl };
+            setProfile(updatedProfile);
             setShowAvatarCreator(false);
-            setShowProfileModal(true); // Reopen profile to show new avatar
-            saveUserData({ curiosities, attributes, needs, vision, profile: { ...profile, avatarUrl }, dailyPlaybook });
             
-            // Show success message
-            setChatMessages([{ 
+            saveUserData({ 
+              curiosities, 
+              attributes, 
+              needs, 
+              vision, 
+              profile: updatedProfile, 
+              dailyPlaybook 
+            });
+            
+            setChatMessages(prev => [...prev, { 
               sender: 'LOA', 
               text: '✨ Your avatar has been created! Looking great!' 
             }]);
+            
+            setTimeout(() => setShowProfileModal(true), 500);
           }
         }
       }
