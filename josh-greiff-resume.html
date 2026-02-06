@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Josh Greiff - Resume</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: white;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        @media print {
+            body {
+                padding: 0;
+                margin: 0;
+            }
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #2c3e50;
+            padding-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .contact {
+            font-size: 0.95rem;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        
+        .links {
+            font-size: 0.9rem;
+            color: #3498db;
+            margin-top: 8px;
+        }
+        
+        .links a {
+            color: #3498db;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        h2 {
+            font-size: 1.5rem;
+            color: #2c3e50;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+        
+        h3 {
+            font-size: 1.1rem;
+            color: #34495e;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+        }
+        
+        .job-title {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .date {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            font-style: italic;
+        }
+        
+        .company {
+            color: #555;
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+        }
+        
+        ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+        
+        li {
+            margin-bottom: 6px;
+            color: #555;
+            line-height: 1.5;
+        }
+        
+        .summary {
+            color: #555;
+            line-height: 1.7;
+            margin-bottom: 20px;
+            text-align: justify;
+        }
+        
+        .skills-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .skill-row {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .skill-label {
+            font-weight: 600;
+            color: #2c3e50;
+            min-width: 120px;
+        }
+        
+        .skill-content {
+            color: #555;
+            flex: 1;
+        }
+        
+        .project {
+            margin-bottom: 15px;
+        }
+        
+        .project-name {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .education-item {
+            margin-bottom: 10px;
+        }
+        
+        .education-title {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .education-detail {
+            color: #555;
+            font-size: 0.95rem;
+        }
+        
+        @page {
+            margin: 0.75in;
+        }
+        
+        /* Print optimization */
+        @media print {
+            body {
+                font-size: 11pt;
+                line-height: 1.5;
+            }
+            
+            h1 {
+                font-size: 24pt;
+            }
+            
+            h2 {
+                font-size: 14pt;
+                margin-top: 12pt;
+            }
+            
+            h3 {
+                font-size: 12pt;
+            }
+            
+            .section {
+                page-break-inside: avoid;
+            }
+            
+            ul {
+                margin-left: 15px;
+            }
+            
+            li {
+                margin-bottom: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Josh Greiff</h1>
+        <div class="contact">Columbus, OH • 614-477-7405 • josh@greiff.org</div>
+        <div class="links">
+            <a href="https://github.com/joshgreiff">github.com/joshgreiff</a> • 
+            <a href="https://linkedin.com/in/joshgreiff">linkedin.com/in/joshgreiff</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Summary</h2>
+        <p class="summary">
+            Frontend-focused software engineer passionate about building secure, Bitcoin-powered systems that empower individual ownership. Experienced across full-stack development with React, Next.js, Node.js, and TypeScript. Proven ability to design, build, and ship polished production applications end-to-end, combining strong technical execution with a deep understanding of Bitcoin's mission and impact.
+        </p>
+    </div>
+
+    <div class="section">
+        <h2>Core Skills</h2>
+        <div class="skills-grid">
+            <div class="skill-row">
+                <span class="skill-label">Languages:</span>
+                <span class="skill-content">JavaScript (ES6+), TypeScript, Python, PHP</span>
+            </div>
+            <div class="skill-row">
+                <span class="skill-label">Frontend:</span>
+                <span class="skill-content">React, Next.js, Tailwind, HTML5, CSS3</span>
+            </div>
+            <div class="skill-row">
+                <span class="skill-label">Backend:</span>
+                <span class="skill-content">Node.js, Express, MongoDB, MySQL, GraphQL</span>
+            </div>
+            <div class="skill-row">
+                <span class="skill-label">Cloud & Tools:</span>
+                <span class="skill-content">Vercel, Railway, Cloudflare, CI/CD, REST APIs</span>
+            </div>
+            <div class="skill-row">
+                <span class="skill-label">Learning:</span>
+                <span class="skill-content">Elixir, Phoenix, Postgres, Kubernetes</span>
+            </div>
+            <div class="skill-row">
+                <span class="skill-label">Other:</span>
+                <span class="skill-content">A/B Testing, Agile Development, UX Optimization, Git/GitHub</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Experience</h2>
+        
+        <div class="job-header">
+            <div>
+                <div class="job-title">Software Engineer</div>
+                <div class="company">Ignite Engagement Solutions</div>
+            </div>
+            <div class="date">Jan 2023 – Jun 2025</div>
+        </div>
+        <ul>
+            <li>Built and maintained enterprise-scale employee engagement platforms for Fortune 500 companies including Victoria's Secret and Dior.</li>
+            <li>Co-developed a new internal dashboard for Victoria's Secret used by thousands of floor employees daily.</li>
+            <li>Led the build for a standalone training platform for Dior – designed, implemented, and shipped independently.</li>
+            <li>Worked across PHP, Python, and Vue.js codebases to deliver modular, configurable solutions for new clients.</li>
+            <li>Improved platform performance through backend optimizations and UI streamlining, reducing load times and support requests.</li>
+        </ul>
+
+        <div class="job-header">
+            <div>
+                <div class="job-title">Co-founder & Lead Developer</div>
+                <div class="company">AnyLingo</div>
+            </div>
+            <div class="date">Jan 2025 – Present</div>
+        </div>
+        <ul>
+            <li>Building a full-stack AI-driven language learning SaaS that leverages subconscious training methods.</li>
+            <li>Architected the platform with Next.js 14, Node.js, Express, MongoDB, and Square API for secure subscriptions and trials.</li>
+            <li>Implemented advanced features like real-time speech highlighting, multilingual translation, and lesson reordering.</li>
+            <li>Designed scalable data models for user progress, content creation, and payments.</li>
+            <li>Deployed and maintained production infrastructure via Vercel and Railway.</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>Independent Projects</h2>
+        
+        <div class="project">
+            <div class="project-name">Sats Arcade – Play-to-earn Bitcoin gaming platform</div>
+            <ul>
+                <li>Built from the ground up using Next.js and Supabase.</li>
+                <li>Designed leaderboard tracking, authentication, and anti-spam systems after encountering real-world security challenges.</li>
+                <li>Reached 50+ daily players with automated prize distribution and Lightning reward integration.</li>
+            </ul>
+        </div>
+
+        <div class="project">
+            <div class="project-name">Wander Studios – Pilates & wellness booking platform</div>
+            <ul>
+                <li>Created full scheduling, class management, and payment system with Square API.</li>
+                <li>Integrated Bitcoin payments for class packages and single sessions.</li>
+                <li>Built the entire front and backend stack to support business operations for a live studio.</li>
+            </ul>
+        </div>
+
+        <div class="project">
+            <div class="project-name">Awake – AI-powered goal visualization app</div>
+            <ul>
+                <li>Experimenting with journaling, goal setting, and gamified self-improvement through AI guidance.</li>
+                <li>Built local-first prototype with Nostr-based identity and IndexedDB storage.</li>
+            </ul>
+        </div>
+
+        <div class="project">
+            <div class="project-name">Work Save Bitcoin (YouTube)</div>
+            <ul>
+                <li>Educational Bitcoin channel with 1.4K subscribers, focused on sound money and long-term Bitcoin adoption.</li>
+                <li>Scripts, films, and edits content emphasizing Bitcoin's fundamentals and practical use cases.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Education</h2>
+        <div class="education-item">
+            <div class="education-title">Full Stack Web Development Certificate</div>
+            <div class="education-detail">The Ohio State University & 2U – 2022</div>
+        </div>
+        <div class="education-item">
+            <div class="education-title">Olentangy Liberty High School, Summa Cum Laude</div>
+            <div class="education-detail">GPA 4.1</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Additional Skills</h2>
+        <ul>
+            <li>Deep understanding of Bitcoin fundamentals and Lightning Network integration.</li>
+            <li>Experienced building production-ready SaaS products from concept to deployment.</li>
+            <li>Strong communication, ownership, and initiative – proven ability to work independently or collaboratively.</li>
+            <li>Passionate about engineering education and open-source collaboration.</li>
+        </ul>
+    </div>
+</body>
+</html>
+
