@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   Lightbulb, Brain, User, Heart, Zap, Target,
@@ -8,6 +9,8 @@ import { AwakeLogo } from './AwakeLogo';
 import { LoaCompanion } from './LoaCompanion';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
+import { LoaChat } from './LoaChat';
+import { AISettings } from './AISettings';
 import type { UserData } from './OnboardingFlow';
 
 interface DashboardProps {
@@ -26,6 +29,9 @@ const statConfig = [
 ];
 
 export function Dashboard({ userData, onReset }: DashboardProps) {
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
   const stats = userData.stats || {};
   const attractions = userData.preferences?.attractions || [];
   const resistances = userData.preferences?.resistances || [];
@@ -69,7 +75,16 @@ export function Dashboard({ userData, onReset }: DashboardProps) {
             animate={{ opacity: 1, y: 0 }}
             className="text-center mb-12"
           >
-            <LoaCompanion size={80} withLabel={false} animated={true} />
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="group cursor-pointer transition-transform hover:scale-105"
+              title="Talk to Loa"
+            >
+              <LoaCompanion size={80} withLabel={false} animated={true} />
+              <p className="text-xs text-muted-foreground mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                Click to talk to Loa
+              </p>
+            </button>
             
             {userData.intention && (
               <motion.div
@@ -248,38 +263,83 @@ export function Dashboard({ userData, onReset }: DashboardProps) {
             </motion.section>
           </div>
 
-          {/* Coming Soon Section */}
+          {/* Quick Actions Section */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
             className="grid md:grid-cols-3 gap-4"
           >
-            {[
-              { icon: MessageCircle, title: 'Daily Reflection', desc: 'Chat with Loa', color: '#6366f1' },
-              { icon: Calendar, title: 'Quests', desc: 'Coming soon', color: '#14b8a6' },
-              { icon: Settings, title: 'AI Settings', desc: 'Configure your AI', color: '#f59e0b' }
-            ].map((item, i) => (
-              <motion.div
-                key={item.title}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 + i * 0.1 }}
-                className="p-6 rounded-xl text-center cursor-pointer hover:scale-[1.02] transition-transform"
-                style={{
-                  background: `${item.color}08`,
-                  border: `1px dashed ${item.color}30`
-                }}
-              >
-                <item.icon className="w-8 h-8 mx-auto mb-3 opacity-40" style={{ color: item.color }} />
-                <p className="font-medium mb-1">{item.title}</p>
-                <p className="text-xs opacity-50">{item.desc}</p>
-              </motion.div>
-            ))}
+            {/* Talk to Loa */}
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              onClick={() => setIsChatOpen(true)}
+              className="p-6 rounded-xl text-center cursor-pointer hover:scale-[1.02] transition-transform"
+              style={{
+                background: '#6366f108',
+                border: '1px solid #6366f130'
+              }}
+            >
+              <MessageCircle className="w-8 h-8 mx-auto mb-3" style={{ color: '#6366f1' }} />
+              <p className="font-medium mb-1">Talk to Loa</p>
+              <p className="text-xs opacity-50">Your AI companion</p>
+            </motion.button>
+
+            {/* Quests - Coming Soon */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+              className="p-6 rounded-xl text-center opacity-60"
+              style={{
+                background: '#14b8a608',
+                border: '1px dashed #14b8a630'
+              }}
+            >
+              <Calendar className="w-8 h-8 mx-auto mb-3 opacity-40" style={{ color: '#14b8a6' }} />
+              <p className="font-medium mb-1">Quests</p>
+              <p className="text-xs opacity-50">Coming soon</p>
+            </motion.div>
+
+            {/* AI Settings */}
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.9 }}
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-6 rounded-xl text-center cursor-pointer hover:scale-[1.02] transition-transform"
+              style={{
+                background: '#f59e0b08',
+                border: '1px solid #f59e0b30'
+              }}
+            >
+              <Settings className="w-8 h-8 mx-auto mb-3" style={{ color: '#f59e0b' }} />
+              <p className="font-medium mb-1">AI Settings</p>
+              <p className="text-xs opacity-50">Configure your AI</p>
+            </motion.button>
           </motion.section>
 
         </div>
       </main>
+
+      {/* Loa Chat Modal */}
+      <LoaChat
+        userData={userData}
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        onOpenSettings={() => {
+          setIsChatOpen(false);
+          setIsSettingsOpen(true);
+        }}
+      />
+
+      {/* AI Settings Modal */}
+      <AISettings
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
   );
 }
