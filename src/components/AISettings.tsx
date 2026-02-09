@@ -164,15 +164,23 @@ export function AISettings({ isOpen, onClose }: AISettingsProps) {
                 )}
               </div>
               {!ollamaStatus.running && (
-                <div className="mt-2 text-xs text-muted-foreground">
-                  <p>Install Ollama to run AI locally:</p>
+                <div className="mt-2 text-xs text-muted-foreground space-y-2">
+                  <p>Ollama not detected. This could mean:</p>
+                  <ul className="list-disc list-inside space-y-1 opacity-80">
+                    <li>Ollama isn't running</li>
+                    <li>CORS is blocking the connection (if using from a website)</li>
+                  </ul>
+                  <div className="mt-2 p-2 rounded bg-background/50 font-mono text-[10px] break-all">
+                    <p className="opacity-60 mb-1">Fix CORS by running:</p>
+                    OLLAMA_ORIGINS="https://www.awakeapp.space,http://localhost:*" ollama serve
+                  </div>
                   <a 
                     href="https://ollama.ai" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-primary hover:underline flex items-center gap-1 mt-1"
                   >
-                    ollama.ai <ExternalLink className="w-3 h-3" />
+                    Get Ollama <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
               )}

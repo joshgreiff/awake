@@ -352,7 +352,7 @@ class AIService {
   }
 
   // Check if Ollama is running
-  async checkOllamaStatus(): Promise<{ running: boolean; models: string[] }> {
+  async checkOllamaStatus(): Promise<{ running: boolean; models: string[]; error?: string }> {
     try {
       const response = await fetch('http://localhost:11434/api/tags');
       if (!response.ok) {
@@ -361,8 +361,16 @@ class AIService {
       const data = await response.json();
       const models = data.models?.map((m: { name: string }) => m.name) || [];
       return { running: true, models };
-    } catch {
-      return { running: false, models: [] };
+    } catch (err) {
+      // Check if it's likely a CORS error
+      const isCorsError = err instanceof TypeError && 
+        (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'));
+      
+      return { 
+        running: false, 
+        models: [],
+        error: isCorsError ? 'cors' : 'connection'
+      };
     }
   }
 }
