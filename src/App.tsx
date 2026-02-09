@@ -10,16 +10,27 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('landing');
   const [userData, setUserData] = useState<UserData | null>(null);
 
-  // Check for existing user data
+  // Check for existing user data and auto-redirect to dashboard
   useEffect(() => {
     const savedData = localStorage.getItem('awake_user_data');
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
         setUserData(parsed);
+        // If user has completed onboarding, go straight to dashboard
+        if (parsed.identity?.name) {
+          setViewMode('dashboard');
+        }
       } catch (e) {
         console.error('Failed to parse saved user data:', e);
       }
+    }
+    
+    // Also check for in-progress onboarding
+    const onboardingProgress = localStorage.getItem('awake_onboarding_progress');
+    if (onboardingProgress && !savedData) {
+      // Resume onboarding if they were in the middle of it
+      setViewMode('onboarding');
     }
   }, []);
 
@@ -33,6 +44,14 @@ export default function App() {
   if (viewMode === 'onboarding') {
     return <OnboardingFlow onComplete={handleOnboardingComplete} />;
   }
+
+  // Reset user data and start fresh
+  const handleReset = () => {
+    localStorage.removeItem('awake_user_data');
+    localStorage.removeItem('awake_onboarding_progress');
+    setUserData(null);
+    setViewMode('landing');
+  };
 
   // Show dashboard (placeholder for now)
   if (viewMode === 'dashboard') {
@@ -48,20 +67,62 @@ export default function App() {
           }}>
             Welcome, {userData?.identity?.name || 'Traveler'}!
           </h2>
-          <p className="opacity-70 mb-8">
+          <p className="opacity-70 mb-4">
             Dashboard coming soon. Your profile has been saved.
           </p>
-          <Button
-            onClick={() => setViewMode('landing')}
-            variant="outline"
-            className="px-6 py-4 rounded-full cursor-pointer"
-            style={{
-              borderColor: "rgba(99, 102, 241, 0.3)",
-              background: "rgba(99, 102, 241, 0.05)"
-            }}
-          >
-            Back to Landing
-          </Button>
+          
+          {/* Show some user data */}
+          {userData && (
+            <div className="mb-8 p-4 rounded-xl text-left text-sm" style={{
+              background: 'rgba(99, 102, 241, 0.1)',
+              border: '1px solid rgba(99, 102, 241, 0.2)'
+            }}>
+              <p className="opacity-60 text-xs mb-2 text-center">YOUR PROFILE</p>
+              {userData.intention && (
+                <p className="italic text-center mb-3" style={{ color: '#f59e0b' }}>
+                  "{userData.intention}"
+                </p>
+              )}
+              {userData.stats && (
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  {Object.entries(userData.stats).map(([key, value]) => (
+                    <div key={key} className="text-center p-2 rounded" style={{
+                      background: 'rgba(99, 102, 241, 0.1)'
+                    }}>
+                      <p className="text-xs opacity-60 capitalize">{key}</p>
+                      <p className="text-lg" style={{ color: '#6366f1' }}>{value}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          
+          <div className="flex gap-4 justify-center flex-wrap">
+            <Button
+              onClick={() => setViewMode('landing')}
+              variant="outline"
+              className="px-6 py-4 rounded-full cursor-pointer"
+              style={{
+                borderColor: "rgba(99, 102, 241, 0.3)",
+                background: "rgba(99, 102, 241, 0.05)"
+              }}
+            >
+              Back to Landing
+            </Button>
+            <Button
+              onClick={handleReset}
+              variant="outline"
+              className="px-6 py-4 rounded-full cursor-pointer"
+              style={{
+                borderColor: "rgba(239, 68, 68, 0.3)",
+                background: "rgba(239, 68, 68, 0.05)",
+                color: "#ef4444"
+              }}
+            >
+              Start Fresh
+            </Button>
+          </div>
         </div>
       </div>
     );
