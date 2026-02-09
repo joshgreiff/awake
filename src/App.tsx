@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { AwakeLogo } from './components/AwakeLogo';
 import { Button } from './components/ui/button';
 import { OnboardingFlow, type UserData } from './components/OnboardingFlow';
+import { Dashboard } from './components/Dashboard';
 
 type ViewMode = 'landing' | 'onboarding' | 'dashboard';
 
@@ -53,78 +54,13 @@ export default function App() {
     setViewMode('landing');
   };
 
-  // Show dashboard (placeholder for now)
-  if (viewMode === 'dashboard') {
+  // Show dashboard
+  if (viewMode === 'dashboard' && userData) {
     return (
-      <div className="min-h-screen w-full bg-background flex items-center justify-center p-8">
-        <div className="text-center max-w-2xl">
-          <AwakeLogo size="medium" />
-          <h2 className="text-2xl mt-8 mb-4" style={{
-            background: "linear-gradient(135deg, #6366f1, #14b8a6)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text"
-          }}>
-            Welcome, {userData?.identity?.name || 'Traveler'}!
-          </h2>
-          <p className="opacity-70 mb-4">
-            Dashboard coming soon. Your profile has been saved.
-          </p>
-          
-          {/* Show some user data */}
-          {userData && (
-            <div className="mb-8 p-4 rounded-xl text-left text-sm" style={{
-              background: 'rgba(99, 102, 241, 0.1)',
-              border: '1px solid rgba(99, 102, 241, 0.2)'
-            }}>
-              <p className="opacity-60 text-xs mb-2 text-center">YOUR PROFILE</p>
-              {userData.intention && (
-                <p className="italic text-center mb-3" style={{ color: '#f59e0b' }}>
-                  "{userData.intention}"
-                </p>
-              )}
-              {userData.stats && (
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {Object.entries(userData.stats).map(([key, value]) => (
-                    <div key={key} className="text-center p-2 rounded" style={{
-                      background: 'rgba(99, 102, 241, 0.1)'
-                    }}>
-                      <p className="text-xs opacity-60 capitalize">{key}</p>
-                      <p className="text-lg" style={{ color: '#6366f1' }}>{value}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          
-          <div className="flex gap-4 justify-center flex-wrap">
-            <Button
-              onClick={() => setViewMode('landing')}
-              variant="outline"
-              className="px-6 py-4 rounded-full cursor-pointer"
-              style={{
-                borderColor: "rgba(99, 102, 241, 0.3)",
-                background: "rgba(99, 102, 241, 0.05)"
-              }}
-            >
-              Back to Landing
-            </Button>
-            <Button
-              onClick={handleReset}
-              variant="outline"
-              className="px-6 py-4 rounded-full cursor-pointer"
-              style={{
-                borderColor: "rgba(239, 68, 68, 0.3)",
-                background: "rgba(239, 68, 68, 0.05)",
-                color: "#ef4444"
-              }}
-            >
-              Start Fresh
-            </Button>
-          </div>
-        </div>
-      </div>
+      <Dashboard 
+        userData={userData} 
+        onReset={handleReset}
+      />
     );
   }
 
