@@ -96,17 +96,6 @@ How Loa (the AI companion) works:
 
 ---
 
-## Aurora's Contributions
-
-*Aurora - please add notes here about your onboarding changes!*
-
-### Onboarding Changes (In Progress)
-- [ ] *Add details about flow changes*
-- [ ] *Add details about UI/UX updates*
-- [ ] *Add any new screens or concepts*
-
----
-
 ## Development Notes
 
 ### Running Locally
