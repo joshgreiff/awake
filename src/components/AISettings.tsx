@@ -19,7 +19,7 @@ interface AISettingsProps {
 }
 
 export function AISettings({ isOpen, onClose }: AISettingsProps) {
-  const [selectedProvider, setSelectedProvider] = useState<ProviderId>('claude');
+  const [selectedProvider, setSelectedProvider] = useState<ProviderId>('awake');
   const [apiKey, setApiKey] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [isTesting, setIsTesting] = useState(false);

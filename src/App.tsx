@@ -4,40 +4,103 @@ import { AwakeLogo } from './components/AwakeLogo';
 import { Button } from './components/ui/button';
 import { OnboardingFlow, type UserData } from './components/OnboardingFlow';
 import { Dashboard } from './components/Dashboard';
+import { AuthModal } from './components/AuthModal';
+import { auth, userData as userDataService, isSupabaseConfigured } from './services/supabase';
+import type { User } from '@supabase/supabase-js';
 
 type ViewMode = 'landing' | 'onboarding' | 'dashboard';
 
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('landing');
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing user data and auto-redirect to dashboard
+  // Initialize auth and load user data
   useEffect(() => {
-    const savedData = localStorage.getItem('awake_user_data');
-    if (savedData) {
+    const init = async () => {
       try {
-        const parsed = JSON.parse(savedData);
-        setUserData(parsed);
-        // If user has completed onboarding, go straight to dashboard
-        if (parsed.identity?.name) {
-          setViewMode('dashboard');
+        // Check for authenticated user (with timeout)
+        if (isSupabaseConfigured()) {
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('timeout')), 5000)
+          );
+          
+          try {
+            const currentUser = await Promise.race([
+              auth.getUser(),
+              timeoutPromise
+            ]) as any;
+            setUser(currentUser);
+          } catch (e) {
+            console.log('Auth check timed out or failed, continuing without auth');
+          }
+
+          // Listen for auth changes
+          auth.onAuthStateChange(async (event, session) => {
+            setUser(session?.user ?? null);
+            
+            if (event === 'SIGNED_IN' && session?.user) {
+              // Sync local data to cloud on first sign in
+              await userDataService.syncLocalToCloud();
+              // Reload user data from cloud
+              const data = await userDataService.load();
+              if (data) {
+                setUserData(data);
+                if (data.identity?.name) {
+                  setViewMode('dashboard');
+                }
+              }
+            }
+          });
         }
-      } catch (e) {
-        console.error('Failed to parse saved user data:', e);
+
+        // Load user data (try Supabase first, fall back to localStorage)
+        let data = null;
+        try {
+          data = await Promise.race([
+            userDataService.load(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+          ]) as UserData | null;
+        } catch (e) {
+          // Fall back to localStorage directly
+          const local = localStorage.getItem('awake_user_data');
+          data = local ? JSON.parse(local) : null;
+        }
+        
+        if (data) {
+          setUserData(data);
+          if (data.identity?.name) {
+            setViewMode('dashboard');
+          }
+        }
+
+        // Check for in-progress onboarding
+        const onboardingProgress = localStorage.getItem('awake_onboarding_progress');
+        if (onboardingProgress && !data) {
+          setViewMode('onboarding');
+        }
+      } catch (err) {
+        console.error('Init error:', err);
       }
-    }
-    
-    // Also check for in-progress onboarding
-    const onboardingProgress = localStorage.getItem('awake_onboarding_progress');
-    if (onboardingProgress && !savedData) {
-      // Resume onboarding if they were in the middle of it
-      setViewMode('onboarding');
-    }
+
+      setIsLoading(false);
+    };
+
+    init();
   }, []);
 
   // Handle onboarding completion
-  const handleOnboardingComplete = (data: UserData) => {
-    setUserData(data);
+  const handleOnboardingComplete = async (data: UserData) => {
+    try {
+      setUserData(data);
+      // Save to Supabase (or localStorage if not logged in)
+      await userDataService.save(data);
+    } catch (err) {
+      console.error('Error saving user data:', err);
+      // Data is still saved to localStorage, continue anyway
+    }
     setViewMode('dashboard');
   };
 
@@ -47,12 +110,29 @@ export default function App() {
   }
 
   // Reset user data and start fresh
-  const handleReset = () => {
+  const handleReset = async () => {
     localStorage.removeItem('awake_user_data');
     localStorage.removeItem('awake_onboarding_progress');
+    localStorage.removeItem('awake_chat_history');
+    
+    // Sign out if logged in
+    if (user) {
+      await auth.signOut();
+      setUser(null);
+    }
+    
     setUserData(null);
     setViewMode('landing');
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full bg-background flex items-center justify-center">
+        <AwakeLogo size="medium" />
+      </div>
+    );
+  }
 
   // Show dashboard
   if (viewMode === 'dashboard' && userData) {
@@ -166,14 +246,30 @@ export default function App() {
             className="mt-12 flex gap-4 justify-center flex-wrap"
           >
             <Button
-              onClick={() => setViewMode('onboarding')}
+              onClick={async () => {
+                // If already signed in, check for existing data
+                if (user) {
+                  // Try to load/sync data first
+                  await userDataService.syncLocalToCloud();
+                  const data = await userDataService.load();
+                  
+                  if (data?.identity?.name) {
+                    setUserData(data);
+                    setViewMode('dashboard');
+                  } else {
+                    setViewMode('onboarding');
+                  }
+                } else {
+                  setShowAuthModal(true);
+                }
+              }}
               className="px-8 py-6 rounded-full text-base cursor-pointer"
               style={{
                 background: "linear-gradient(135deg, #6366f1, #14b8a6)",
                 boxShadow: "0 0 30px rgba(99, 102, 241, 0.4)"
               }}
             >
-              Begin Your Awakening
+              {user ? (userData?.identity?.name ? 'Go to Dashboard' : 'Continue Setup') : 'Begin Your Awakening'}
             </Button>
             
             {userData?.identity?.name && (
@@ -190,6 +286,18 @@ export default function App() {
               </Button>
             )}
           </motion.div>
+
+          {/* Auth status */}
+          {user && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.6 }}
+              transition={{ delay: 1.8 }}
+              className="mt-4 text-xs"
+            >
+              Signed in as {user.email}
+            </motion.p>
+          )}
         </div>
 
         {/* Version indicator */}
@@ -199,9 +307,33 @@ export default function App() {
           transition={{ delay: 2 }}
           className="absolute bottom-8 text-xs"
         >
-          Awake v2.0 - Phase 1 Setup Complete
+          Awake v2.0 - Supabase Connected
         </motion.div>
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={async () => {
+          setShowAuthModal(false);
+          
+          // Sync local data to cloud and reload
+          await userDataService.syncLocalToCloud();
+          const data = await userDataService.load();
+          
+          if (data?.identity?.name) {
+            setUserData(data);
+            setViewMode('dashboard');
+          } else {
+            setViewMode('onboarding');
+          }
+        }}
+        onContinueAsGuest={() => {
+          setShowAuthModal(false);
+          setViewMode('onboarding');
+        }}
+      />
     </div>
   );
 }

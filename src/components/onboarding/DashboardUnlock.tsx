@@ -19,7 +19,7 @@ export function DashboardUnlock({ userData, onEnter }: DashboardUnlockProps) {
   return (
     <div className="relative w-full h-full overflow-hidden flex items-center justify-center">
       {/* Planet visualization background */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 pointer-events-none">
         {/* Planet core */}
         <motion.div
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"

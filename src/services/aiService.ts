@@ -2,17 +2,31 @@
  * AI Provider Service for Awake
  * 
  * Supports multiple backends:
+ * - Awake Cloud (default) - No setup needed, uses our API
  * - Claude (Anthropic) - BYOK
  * - OpenAI - BYOK
  * - Venice AI - Privacy-focused
  * - Ollama - Local/Self-hosted
- * - Custom OpenAI-compatible endpoints
  */
 
 import type { UserData } from '../components/OnboardingFlow';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 // Provider configurations
 export const PROVIDERS = {
+  awake: {
+    id: 'awake',
+    name: 'Awake Cloud',
+    description: 'Just works - no setup needed',
+    endpoint: null, // Uses Supabase Edge Function
+    defaultModel: 'auto',
+    models: [
+      { id: 'auto', name: 'Automatic (Recommended)' },
+    ],
+    requiresApiKey: false,
+    privacyLevel: 3,
+  },
+  
   claude: {
     id: 'claude',
     name: 'Claude (Anthropic)',
@@ -175,11 +189,11 @@ class AIService {
       }
     }
     
-    // Default config
+    // Default config - Awake Cloud is the default (no setup needed)
     return {
-      provider: 'claude',
+      provider: 'awake',
       apiKey: '',
-      model: PROVIDERS.claude.defaultModel,
+      model: PROVIDERS.awake.defaultModel,
     };
   }
 
@@ -193,7 +207,7 @@ class AIService {
   }
 
   getProvider() {
-    return PROVIDERS[this.config.provider] || PROVIDERS.claude;
+    return PROVIDERS[this.config.provider] || PROVIDERS.awake;
   }
 
   isConfigured(): boolean {
@@ -224,10 +238,12 @@ class AIService {
   }
 
   // Main chat method
-  async chat(messages: Message[], options: ChatOptions = {}): Promise<string> {
+  async chat(messages: Message[], options: ChatOptions = {}, userData?: UserData): Promise<string> {
     const provider = this.getProvider();
 
     switch (provider.id) {
+      case 'awake':
+        return this.chatAwake(messages, userData);
       case 'claude':
         return this.chatClaude(messages, options);
       case 'openai':
@@ -248,15 +264,48 @@ class AIService {
     conversationHistory: Message[] = [],
     options: ChatOptions = {}
   ): Promise<string> {
+    const provider = this.getProvider();
+    
+    // For Awake Cloud, send userData to edge function (it builds the prompt server-side)
+    if (provider.id === 'awake') {
+      const messages: Message[] = [
+        ...conversationHistory.slice(-10),
+        { role: 'user', content: userMessage }
+      ];
+      return this.chat(messages, options, userData);
+    }
+    
+    // For other providers, build prompt client-side
     const systemPrompt = options.systemPrompt || generateLoaSystemPrompt(userData);
     
     const messages: Message[] = [
       { role: 'system', content: systemPrompt },
-      ...conversationHistory.slice(-10), // Keep last 10 messages for context
+      ...conversationHistory.slice(-10),
       { role: 'user', content: userMessage }
     ];
 
     return this.chat(messages, options);
+  }
+
+  // Awake Cloud (Supabase Edge Function)
+  private async chatAwake(messages: Message[], userData?: UserData): Promise<string> {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Awake Cloud requires Supabase to be configured. Please use another provider or set up Supabase.');
+    }
+
+    const { data, error } = await supabase.functions.invoke('chat', {
+      body: { messages, userData }
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Awake Cloud error');
+    }
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    return data.message;
   }
 
   // Claude API
