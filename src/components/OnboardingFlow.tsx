@@ -2,11 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TheAwakening } from './onboarding/TheAwakening';
 import { NamesOfBecoming } from './onboarding/NamesOfBecoming';
-import { InnerConstellation } from './onboarding/InnerConstellation';
-import { MagneticField } from './onboarding/MagneticField';
-import { TurningPoint } from './onboarding/TurningPoint';
-import { MatheticsActivation } from './onboarding/MatheticsActivation';
-import { AlignmentPulse } from './onboarding/AlignmentPulse';
+import { OnboardingArchetype } from './onboarding/OnboardingArchetype';
+import { OnboardingDomains } from './onboarding/OnboardingDomains';
 import { PromiseToSelf } from './onboarding/PromiseToSelf';
 import { DashboardUnlock } from './onboarding/DashboardUnlock';
 
@@ -56,12 +53,9 @@ export interface UserData {
 type Stage = 
   | 'awakening'
   | 'identity'
-  | 'constellation'
-  | 'magnetic'
-  | 'turning'
-  | 'mathetics'
-  | 'alignment'
-  | 'promise'
+  | 'archetype'
+  | 'domains'
+  | 'intention'
   | 'unlock';
 
 const STORAGE_KEY = 'awake_onboarding_progress';
@@ -119,66 +113,36 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         <NamesOfBecoming 
           onContinue={(data) => {
             updateUserData('identity', data);
-            setStage('constellation');
+            setStage('archetype');
           }} 
         />
       )
     },
     {
-      id: 'constellation',
+      id: 'archetype',
       component: (
-        <InnerConstellation 
-          onContinue={(stats) => {
-            updateUserData('stats', stats);
-            setStage('magnetic');
+        <OnboardingArchetype 
+          onContinue={(archetype) => {
+            updateUserData('archetype', archetype);
+            setStage('domains');
           }} 
         />
       )
     },
     {
-      id: 'magnetic',
+      id: 'domains',
       component: (
-        <MagneticField 
-          onContinue={(data) => {
-            updateUserData('preferences', data);
-            setStage('turning');
+        <OnboardingDomains 
+          userName={userData.identity?.name || 'Traveler'}
+          onContinue={(domains) => {
+            updateUserData('domains', domains);
+            setStage('intention');
           }} 
         />
       )
     },
     {
-      id: 'turning',
-      component: (
-        <TurningPoint 
-          onContinue={(data) => {
-            updateUserData('growth', data);
-            setStage('mathetics');
-          }} 
-        />
-      )
-    },
-    {
-      id: 'mathetics',
-      component: (
-        <MatheticsActivation 
-          onContinue={(data) => {
-            updateUserData('mathetics', data);
-            setStage('alignment');
-          }} 
-        />
-      )
-    },
-    {
-      id: 'alignment',
-      component: (
-        <AlignmentPulse 
-          userData={userData}
-          onComplete={() => setStage('promise')} 
-        />
-      )
-    },
-    {
-      id: 'promise',
+      id: 'intention',
       component: (
         <PromiseToSelf 
           userData={userData}

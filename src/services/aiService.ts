@@ -437,8 +437,20 @@ class AIService {
     return data.message.content;
   }
 
-  // Check if Ollama is running
+  // Check if Ollama is running (only works on localhost)
   async checkOllamaStatus(): Promise<{ running: boolean; models: string[]; error?: string }> {
+    // Skip check entirely if not on localhost - prevents CORS errors on live site
+    const isLocalhost = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    
+    if (!isLocalhost) {
+      return { 
+        running: false, 
+        models: [], 
+        error: 'Ollama only works on localhost (desktop app)' 
+      };
+    }
+
     try {
       const response = await fetch('http://localhost:11434/api/tags');
       if (!response.ok) {
@@ -448,14 +460,10 @@ class AIService {
       const models = data.models?.map((m: { name: string }) => m.name) || [];
       return { running: true, models };
     } catch (err) {
-      // Check if it's likely a CORS error
-      const isCorsError = err instanceof TypeError && 
-        (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'));
-      
       return { 
         running: false, 
         models: [],
-        error: isCorsError ? 'cors' : 'connection'
+        error: 'connection'
       };
     }
   }

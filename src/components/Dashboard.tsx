@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   Lightbulb, Brain, User, Heart, Zap, Target,
-  Sparkles, TrendingUp, Calendar, MessageCircle,
-  Settings, LogOut, Plus, Minus, Compass
+  Sparkles, TrendingUp, MessageCircle,
+  Settings, LogOut, Plus, Minus, Compass, BookOpen, Flame, ListChecks
 } from 'lucide-react';
 import { AwakeLogo } from './AwakeLogo';
 import { LoaCompanion } from './LoaCompanion';
@@ -13,6 +13,8 @@ import { LoaChat } from './LoaChat';
 import { AISettings } from './AISettings';
 import { ArchetypeAssessment } from './ArchetypeAssessment';
 import { DomainMapping } from './DomainMapping';
+import { DailyReflection, type ReflectionEntry } from './DailyReflection';
+import { Playbook, type PlaybookData } from './Playbook';
 import type { UserData } from './OnboardingFlow';
 import { 
   type Archetype,
@@ -44,6 +46,8 @@ export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProp
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isArchetypeOpen, setIsArchetypeOpen] = useState(false);
   const [isDomainsOpen, setIsDomainsOpen] = useState(false);
+  const [isReflectionOpen, setIsReflectionOpen] = useState(false);
+  const [isPlaybookOpen, setIsPlaybookOpen] = useState(false);
   
   const stats = userData.stats || {};
   const attractions = userData.preferences?.attractions || [];
@@ -74,6 +78,58 @@ export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProp
       onUpdateUserData({ domains: newDomains });
     }
     setIsDomainsOpen(false);
+  };
+
+  const handleSaveReflection = (reflection: ReflectionEntry) => {
+    const existingReflections = JSON.parse(localStorage.getItem('awake_reflections') || '[]');
+    const updated = [reflection, ...existingReflections].slice(0, 100);
+    localStorage.setItem('awake_reflections', JSON.stringify(updated));
+  };
+
+  // Get reflection streak
+  const getReflectionStreak = (): number => {
+    try {
+      const streakData = localStorage.getItem('awake_reflection_streak');
+      if (!streakData) return 0;
+      const { count, lastDate } = JSON.parse(streakData);
+      const today = new Date().toDateString();
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      if (lastDate === today || lastDate === yesterday) return count;
+      return 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const reflectionStreak = getReflectionStreak();
+
+  // Get playbook progress
+  const getPlaybookProgress = () => {
+    try {
+      const saved = localStorage.getItem('awake_playbook');
+      if (!saved) return { completed: 0, total: 0, hasProject: false };
+      const data = JSON.parse(saved) as PlaybookData;
+      
+      // Reset if new day
+      const today = new Date().toDateString();
+      if (data.lastUpdated !== today) {
+        return { completed: 0, total: data.dailyLevers?.length || 0, hasProject: !!data.currentProject };
+      }
+      
+      return {
+        completed: data.completedToday?.length || 0,
+        total: data.dailyLevers?.length || 0,
+        hasProject: !!data.currentProject,
+      };
+    } catch {
+      return { completed: 0, total: 0, hasProject: false };
+    }
+  };
+
+  const playbookProgress = getPlaybookProgress();
+
+  const handleSavePlaybook = (_playbook: PlaybookData) => {
+    // Could sync to Supabase here
   };
 
   return (
@@ -307,8 +363,58 @@ export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProp
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4"
+            className="grid grid-cols-2 md:grid-cols-3 gap-4"
           >
+            {/* Daily Reflection - Primary Action */}
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.65 }}
+              onClick={() => setIsReflectionOpen(true)}
+              className="p-6 rounded-xl text-center cursor-pointer hover:scale-[1.02] transition-transform"
+              style={{
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(20, 184, 166, 0.1))',
+                border: '1px solid rgba(99, 102, 241, 0.3)'
+              }}
+            >
+              <BookOpen className="w-8 h-8 mx-auto mb-3" style={{ color: '#6366f1' }} />
+              <p className="font-medium mb-1">Daily Reflection</p>
+              {reflectionStreak > 0 ? (
+                <p className="text-xs opacity-70 flex items-center justify-center gap-1">
+                  <Flame className="w-3 h-3 text-orange-500" /> {reflectionStreak} day streak
+                </p>
+              ) : (
+                <p className="text-xs opacity-50">Check in with Loa</p>
+              )}
+            </motion.button>
+
+            {/* Playbook */}
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.68 }}
+              onClick={() => setIsPlaybookOpen(true)}
+              className="p-6 rounded-xl text-center cursor-pointer hover:scale-[1.02] transition-transform"
+              style={{
+                background: playbookProgress.hasProject 
+                  ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(20, 184, 166, 0.1))'
+                  : 'rgba(16, 185, 129, 0.05)',
+                border: playbookProgress.hasProject 
+                  ? '1px solid rgba(16, 185, 129, 0.3)'
+                  : '1px dashed rgba(16, 185, 129, 0.3)'
+              }}
+            >
+              <ListChecks className="w-8 h-8 mx-auto mb-3" style={{ color: '#10b981' }} />
+              <p className="font-medium mb-1">Playbook</p>
+              {playbookProgress.total > 0 ? (
+                <p className="text-xs opacity-70">
+                  {playbookProgress.completed}/{playbookProgress.total} levers
+                </p>
+              ) : (
+                <p className="text-xs opacity-50">Set your focus</p>
+              )}
+            </motion.button>
+
             {/* Talk to Loa */}
             <motion.button
               initial={{ opacity: 0, y: 10 }}
@@ -323,7 +429,7 @@ export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProp
             >
               <MessageCircle className="w-8 h-8 mx-auto mb-3" style={{ color: '#6366f1' }} />
               <p className="font-medium mb-1">Talk to Loa</p>
-              <p className="text-xs opacity-50">Your AI companion</p>
+              <p className="text-xs opacity-50">Open chat</p>
             </motion.button>
 
             {/* Archetype */}
@@ -392,7 +498,7 @@ export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProp
             >
               <Settings className="w-8 h-8 mx-auto mb-3" style={{ color: '#f59e0b' }} />
               <p className="font-medium mb-1">AI Settings</p>
-              <p className="text-xs opacity-50">Configure your AI</p>
+              <p className="text-xs opacity-50">Configure</p>
             </motion.button>
           </motion.section>
 
@@ -431,6 +537,22 @@ export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProp
           onClose={() => setIsDomainsOpen(false)}
         />
       )}
+
+      {/* Daily Reflection Modal */}
+      <DailyReflection
+        userData={userData}
+        isOpen={isReflectionOpen}
+        onClose={() => setIsReflectionOpen(false)}
+        onSaveReflection={handleSaveReflection}
+      />
+
+      {/* Playbook Modal */}
+      <Playbook
+        userData={userData}
+        isOpen={isPlaybookOpen}
+        onClose={() => setIsPlaybookOpen(false)}
+        onSave={handleSavePlaybook}
+      />
     </div>
   );
 }
