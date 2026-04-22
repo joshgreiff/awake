@@ -134,12 +134,24 @@ export default function App() {
     );
   }
 
+  // Handle partial user data updates (like archetype)
+  const handleUpdateUserData = async (partialData: Partial<UserData>) => {
+    const updated = { ...userData, ...partialData } as UserData;
+    setUserData(updated);
+    try {
+      await userDataService.save(updated);
+    } catch (err) {
+      console.error('Error saving updated user data:', err);
+    }
+  };
+
   // Show dashboard
   if (viewMode === 'dashboard' && userData) {
     return (
       <Dashboard 
         userData={userData} 
         onReset={handleReset}
+        onUpdateUserData={handleUpdateUserData}
       />
     );
   }

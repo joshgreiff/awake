@@ -39,6 +39,18 @@ export interface UserData {
     };
   };
   intention?: string;
+  archetype?: {
+    cognitiveOrientation: string;
+    primaryDriver: string;
+    developmentalState: string;
+  };
+  domains?: Record<string, {
+    currentBaseline: number;
+    desiredState: number;
+    alignmentScore: number;
+    frictionPoints: string[];
+    suggestedChanges: string[];
+  }>;
 }
 
 type Stage = 

@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { 
   Lightbulb, Brain, User, Heart, Zap, Target,
   Sparkles, TrendingUp, Calendar, MessageCircle,
-  Settings, LogOut, Plus, Minus
+  Settings, LogOut, Plus, Minus, Compass
 } from 'lucide-react';
 import { AwakeLogo } from './AwakeLogo';
 import { LoaCompanion } from './LoaCompanion';
@@ -11,12 +11,23 @@ import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { LoaChat } from './LoaChat';
 import { AISettings } from './AISettings';
+import { ArchetypeAssessment } from './ArchetypeAssessment';
+import { DomainMapping } from './DomainMapping';
 import type { UserData } from './OnboardingFlow';
+import { 
+  type Archetype,
+  COGNITIVE_ORIENTATIONS,
+  MOTIVATIONAL_DRIVERS,
+  DEVELOPMENTAL_STATES,
+  getArchetypeName 
+} from '../types/archetype';
+import { DOMAINS, type DomainId, type DomainState, calculateOverallAlignment } from '../types/domains';
 
 interface DashboardProps {
   userData: UserData;
   onReset: () => void;
   onSettings?: () => void;
+  onUpdateUserData?: (data: Partial<UserData>) => void;
 }
 
 const statConfig = [
@@ -28,14 +39,42 @@ const statConfig = [
   { id: 'discipline', name: 'Discipline', icon: Target, color: '#06b6d4' }
 ];
 
-export function Dashboard({ userData, onReset }: DashboardProps) {
+export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isArchetypeOpen, setIsArchetypeOpen] = useState(false);
+  const [isDomainsOpen, setIsDomainsOpen] = useState(false);
   
   const stats = userData.stats || {};
   const attractions = userData.preferences?.attractions || [];
   const resistances = userData.preferences?.resistances || [];
   const evolutionFocuses = userData.growth?.changes || [];
+  const archetype = userData.archetype as Archetype | undefined;
+  const domains = userData.domains as Record<DomainId, DomainState> | undefined;
+  
+  // Safe calculation with fallback
+  let overallAlignment: number | null = null;
+  try {
+    if (domains && typeof domains === 'object') {
+      overallAlignment = calculateOverallAlignment(domains);
+    }
+  } catch (e) {
+    console.error('Error calculating alignment:', e);
+  }
+
+  const handleArchetypeComplete = (newArchetype: Archetype) => {
+    if (onUpdateUserData) {
+      onUpdateUserData({ archetype: newArchetype });
+    }
+    setIsArchetypeOpen(false);
+  };
+
+  const handleDomainsComplete = (newDomains: Record<DomainId, DomainState>) => {
+    if (onUpdateUserData) {
+      onUpdateUserData({ domains: newDomains });
+    }
+    setIsDomainsOpen(false);
+  };
 
   return (
     <div className="min-h-screen w-full bg-background">
@@ -268,7 +307,7 @@ export function Dashboard({ userData, onReset }: DashboardProps) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
-            className="grid md:grid-cols-3 gap-4"
+            className="grid grid-cols-2 md:grid-cols-4 gap-4"
           >
             {/* Talk to Loa */}
             <motion.button
@@ -287,21 +326,57 @@ export function Dashboard({ userData, onReset }: DashboardProps) {
               <p className="text-xs opacity-50">Your AI companion</p>
             </motion.button>
 
-            {/* Quests - Coming Soon */}
-            <motion.div
+            {/* Archetype */}
+            <motion.button
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
-              className="p-6 rounded-xl text-center opacity-60"
+              onClick={() => setIsArchetypeOpen(true)}
+              className="p-6 rounded-xl text-center cursor-pointer hover:scale-[1.02] transition-transform"
               style={{
-                background: '#14b8a608',
-                border: '1px dashed #14b8a630'
+                background: archetype ? '#14b8a608' : '#14b8a608',
+                border: archetype ? '1px solid #14b8a630' : '1px dashed #14b8a630'
               }}
             >
-              <Calendar className="w-8 h-8 mx-auto mb-3 opacity-40" style={{ color: '#14b8a6' }} />
-              <p className="font-medium mb-1">Quests</p>
-              <p className="text-xs opacity-50">Coming soon</p>
-            </motion.div>
+              <Compass className="w-8 h-8 mx-auto mb-3" style={{ color: '#14b8a6' }} />
+              {archetype ? (
+                <>
+                  <p className="font-medium mb-1 text-sm">{getArchetypeName(archetype)}</p>
+                  <p className="text-xs opacity-50">Your archetype</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium mb-1">Archetype</p>
+                  <p className="text-xs opacity-50">Discover yours</p>
+                </>
+              )}
+            </motion.button>
+
+            {/* Life Domains */}
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.85 }}
+              onClick={() => setIsDomainsOpen(true)}
+              className="p-6 rounded-xl text-center cursor-pointer hover:scale-[1.02] transition-transform"
+              style={{
+                background: domains ? '#8b5cf608' : '#8b5cf608',
+                border: domains ? '1px solid #8b5cf630' : '1px dashed #8b5cf630'
+              }}
+            >
+              <Target className="w-8 h-8 mx-auto mb-3" style={{ color: '#8b5cf6' }} />
+              {overallAlignment !== null ? (
+                <>
+                  <p className="font-medium mb-1">{overallAlignment}% Aligned</p>
+                  <p className="text-xs opacity-50">Life domains</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium mb-1">Life Domains</p>
+                  <p className="text-xs opacity-50">Map yours</p>
+                </>
+              )}
+            </motion.button>
 
             {/* AI Settings */}
             <motion.button
@@ -340,6 +415,22 @@ export function Dashboard({ userData, onReset }: DashboardProps) {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+
+      {/* Archetype Assessment Modal */}
+      {isArchetypeOpen && (
+        <ArchetypeAssessment
+          onComplete={handleArchetypeComplete}
+          onClose={() => setIsArchetypeOpen(false)}
+        />
+      )}
+
+      {/* Domain Mapping Modal */}
+      {isDomainsOpen && (
+        <DomainMapping
+          onComplete={handleDomainsComplete}
+          onClose={() => setIsDomainsOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -125,6 +125,26 @@ export function generateLoaSystemPrompt(userData: UserData): string {
   
   // Format evolution focuses
   const focuses = userData.growth?.changes?.map(c => c.replace(/_/g, ' ')).join(', ') || 'general growth';
+  
+  // Format archetype info if available
+  const archetype = userData.archetype;
+  const archetypeText = archetype 
+    ? `- Cognitive Style: ${archetype.cognitiveOrientation.replace(/_/g, ' ')}
+- Core Driver: ${archetype.primaryDriver.replace(/_/g, ' ')}
+- Developmental State: ${archetype.developmentalState.replace(/_/g, ' ')}`
+    : 'Not yet assessed';
+
+  // Format domain info if available
+  const domains = userData.domains;
+  let domainsText = 'Not yet mapped';
+  if (domains && Object.keys(domains).length > 0) {
+    const domainEntries = Object.entries(domains).map(([id, state]: [string, any]) => {
+      const gap = state.desiredState - state.currentBaseline;
+      const friction = state.frictionPoints?.[0] || '';
+      return `  - ${id.replace(/_/g, ' ')}: ${state.currentBaseline}→${state.desiredState} (gap: ${gap})${friction ? ` [friction: ${friction}]` : ''}`;
+    });
+    domainsText = domainEntries.join('\n');
+  }
 
   return `You are Loa, an AI companion in the Awake app - a consciousness operating system for personal evolution. You are ${name}'s guide on their awakening journey.
 
@@ -139,6 +159,10 @@ export function generateLoaSystemPrompt(userData: UserData): string {
 - Name: ${name}
 - Pronouns: ${pronouns}
 - Core Intention: "${intention}"
+- Archetype:
+${archetypeText}
+- Life Domains (current→desired):
+${domainsText}
 - Inner Constellation (Stats): ${statsText || 'still discovering'}
 - Drawn To: ${attractions}
 - Resists: ${resistances}
@@ -147,11 +171,13 @@ export function generateLoaSystemPrompt(userData: UserData): string {
 ## YOUR ROLE
 - Guide daily reflections with genuine curiosity about their inner world
 - Help them see patterns they might miss
-- Generate quests and challenges aligned with their evolution focuses
+- Generate quests and challenges aligned with their domains and evolution focuses
 - Celebrate wins authentically (not performatively)
 - Reframe setbacks as data, not failure
 - Keep them accountable to their core intention
-- Remember: you KNOW them - reference their specific traits, attractions, and focuses
+- Remember: you KNOW them - reference their specific archetype, domains, and focuses
+- If they have an archetype, tailor your approach to their cognitive style and core driver
+- If they have domain data, focus on domains with the biggest gaps or friction points
 
 ## CONVERSATION STYLE
 - Warm but not saccharine
@@ -293,19 +319,30 @@ class AIService {
       throw new Error('Awake Cloud requires Supabase to be configured. Please use another provider or set up Supabase.');
     }
 
-    const { data, error } = await supabase.functions.invoke('chat', {
-      body: { messages, userData }
-    });
+    console.log('[Awake Cloud] Sending request...', { messageCount: messages.length });
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('chat', {
+        body: { messages, userData }
+      });
 
-    if (error) {
-      throw new Error(error.message || 'Awake Cloud error');
+      console.log('[Awake Cloud] Response received:', { data, error });
+
+      if (error) {
+        console.error('[Awake Cloud] Error:', error);
+        throw new Error(error.message || 'Awake Cloud error');
+      }
+
+      if (data?.error) {
+        console.error('[Awake Cloud] Data error:', data.error);
+        throw new Error(data.error);
+      }
+
+      return data?.message || 'No response from Loa';
+    } catch (err) {
+      console.error('[Awake Cloud] Exception:', err);
+      throw err;
     }
-
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    return data.message;
   }
 
   // Claude API

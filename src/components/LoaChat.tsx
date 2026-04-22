@@ -83,10 +83,18 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
   const generateGreeting = async () => {
     setIsLoading(true);
     try {
-      const greeting = await aiService.chatWithContext(
-        `This is the start of our conversation. Greet me warmly as ${userName}, acknowledge my core intention ("${userData.intention || 'evolving'}"), and ask how I'm doing today. Keep it brief and genuine.`,
-        userData
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('timeout')), 15000)
       );
+
+      const greeting = await Promise.race([
+        aiService.chatWithContext(
+          `This is the start of our conversation. Greet me warmly as ${userName}, acknowledge my core intention ("${userData.intention || 'evolving'}"), and ask how I'm doing today. Keep it brief and genuine.`,
+          userData
+        ),
+        timeoutPromise
+      ]);
       
       setMessages([{
         id: `${Date.now()}`,
@@ -103,8 +111,9 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
         content: `Hey ${userName}! I'm Loa, your companion on this journey. How are you feeling today?`,
         timestamp: new Date()
       }]);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const sendMessage = async () => {
@@ -129,11 +138,15 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
         content: m.content
       }));
 
-      const response = await aiService.chatWithContext(
-        userMessage.content,
-        userData,
-        history
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Request timed out. Please try again.')), 30000)
       );
+
+      const response = await Promise.race([
+        aiService.chatWithContext(userMessage.content, userData, history),
+        timeoutPromise
+      ]);
 
       const assistantMessage: ChatMessage = {
         id: `${Date.now() + 1}`,
@@ -151,13 +164,13 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
       const errorMessage: ChatMessage = {
         id: `${Date.now() + 1}`,
         role: 'assistant',
-        content: `I'm having trouble connecting right now. ${message.includes('API key') ? 'Please check your AI settings.' : 'Please try again.'}`,
+        content: `I'm having trouble connecting right now. ${message.includes('API key') ? 'Please check your AI settings.' : message.includes('timeout') ? 'The request timed out.' : 'Please try again.'}`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
