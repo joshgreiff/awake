@@ -15,6 +15,7 @@ import { ArchetypeAssessment } from './ArchetypeAssessment';
 import { DomainMapping } from './DomainMapping';
 import { DailyReflection, type ReflectionEntry } from './DailyReflection';
 import { Playbook, type PlaybookData } from './Playbook';
+import { AwakeSession } from './AwakeSession';
 import type { UserData } from './OnboardingFlow';
 import { 
   type Archetype,
@@ -48,6 +49,7 @@ export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProp
   const [isDomainsOpen, setIsDomainsOpen] = useState(false);
   const [isReflectionOpen, setIsReflectionOpen] = useState(false);
   const [isPlaybookOpen, setIsPlaybookOpen] = useState(false);
+  const [isSessionOpen, setIsSessionOpen] = useState(false);
   
   const stats = userData.stats || {};
   const attractions = userData.preferences?.attractions || [];
@@ -365,27 +367,21 @@ export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProp
             transition={{ delay: 0.6 }}
             className="grid grid-cols-2 md:grid-cols-3 gap-4"
           >
-            {/* Daily Reflection - Primary Action */}
+            {/* Check In - Primary Action */}
             <motion.button
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.65 }}
-              onClick={() => setIsReflectionOpen(true)}
-              className="p-6 rounded-xl text-center cursor-pointer hover:scale-[1.02] transition-transform"
+              onClick={() => setIsSessionOpen(true)}
+              className="p-6 rounded-xl text-center cursor-pointer hover:scale-[1.02] transition-transform col-span-2 md:col-span-1"
               style={{
-                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(20, 184, 166, 0.1))',
-                border: '1px solid rgba(99, 102, 241, 0.3)'
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(20, 184, 166, 0.15))',
+                border: '2px solid rgba(99, 102, 241, 0.4)'
               }}
             >
-              <BookOpen className="w-8 h-8 mx-auto mb-3" style={{ color: '#6366f1' }} />
-              <p className="font-medium mb-1">Daily Reflection</p>
-              {reflectionStreak > 0 ? (
-                <p className="text-xs opacity-70 flex items-center justify-center gap-1">
-                  <Flame className="w-3 h-3 text-orange-500" /> {reflectionStreak} day streak
-                </p>
-              ) : (
-                <p className="text-xs opacity-50">Check in with Loa</p>
-              )}
+              <Sparkles className="w-8 h-8 mx-auto mb-3" style={{ color: '#6366f1' }} />
+              <p className="font-medium mb-1">Check In</p>
+              <p className="text-xs opacity-50">Start your session</p>
             </motion.button>
 
             {/* Playbook */}
@@ -552,6 +548,13 @@ export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProp
         isOpen={isPlaybookOpen}
         onClose={() => setIsPlaybookOpen(false)}
         onSave={handleSavePlaybook}
+      />
+
+      {/* Awake Session (State Check-In + Mode) */}
+      <AwakeSession
+        userData={userData}
+        isOpen={isSessionOpen}
+        onClose={() => setIsSessionOpen(false)}
       />
     </div>
   );
