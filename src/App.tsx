@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { AwakeLogo } from './components/AwakeLogo';
 import { Button } from './components/ui/button';
 import { OnboardingFlow, type UserData } from './components/OnboardingFlow';
-import { Dashboard } from './components/Dashboard';
+import { Cockpit } from './components/Cockpit';
 import { AuthModal } from './components/AuthModal';
 import { auth, userData as userDataService, isSupabaseConfigured } from './services/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -145,10 +145,10 @@ export default function App() {
     }
   };
 
-  // Show dashboard
+  // Show cockpit (consciousness control panel)
   if (viewMode === 'dashboard' && userData) {
     return (
-      <Dashboard 
+      <Cockpit 
         userData={userData} 
         onReset={handleReset}
         onUpdateUserData={handleUpdateUserData}
