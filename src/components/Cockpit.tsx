@@ -65,7 +65,21 @@ const WIDGET_TYPES = [
 export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
   const [sliders, setSliders] = useState<StateSlider[]>(() => {
     const saved = localStorage.getItem('awake_cockpit_sliders');
-    return saved ? JSON.parse(saved) : DEFAULT_SLIDERS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Merge saved values with default icons (icons can't be serialized)
+        return DEFAULT_SLIDERS.map(defaultSlider => {
+          const savedSlider = parsed.find((s: any) => s.id === defaultSlider.id);
+          return savedSlider 
+            ? { ...defaultSlider, value: savedSlider.value }
+            : defaultSlider;
+        });
+      } catch (e) {
+        return DEFAULT_SLIDERS;
+      }
+    }
+    return DEFAULT_SLIDERS;
   });
   
   const [widgets, setWidgets] = useState<Widget[]>(() => {
@@ -89,9 +103,10 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
   const archetype = userData.archetype;
   const archetypeName = archetype ? getArchetypeName(archetype) : null;
 
-  // Save sliders when they change
+  // Save sliders when they change (only save serializable data)
   useEffect(() => {
-    localStorage.setItem('awake_cockpit_sliders', JSON.stringify(sliders));
+    const toSave = sliders.map(({ id, value }) => ({ id, value }));
+    localStorage.setItem('awake_cockpit_sliders', JSON.stringify(toSave));
   }, [sliders]);
 
   // Save widgets when they change
@@ -401,19 +416,21 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
       </AnimatePresence>
 
       {/* Loa Chat */}
-      {isChatOpen && (
-        <LoaChat
-          userData={userData}
-          onClose={() => setIsChatOpen(false)}
-        />
-      )}
+      <LoaChat
+        userData={userData}
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        onOpenSettings={() => {
+          setIsChatOpen(false);
+          setIsSettingsOpen(true);
+        }}
+      />
 
       {/* AI Settings */}
-      {isSettingsOpen && (
-        <AISettings
-          onClose={() => setIsSettingsOpen(false)}
-        />
-      )}
+      <AISettings
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
   );
 }
