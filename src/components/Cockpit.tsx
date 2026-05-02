@@ -16,13 +16,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, Brain, Eye, Heart, Flame, Target,
   MessageCircle, Settings, Trash2, Plus,
-  Sparkles, Sun, Moon, Star
+  Sparkles, Sun, Moon, Star, Hexagon
 } from 'lucide-react';
 import { LoaCompanion } from './LoaCompanion';
 import { LoaChat } from './LoaChat';
 import { AISettings } from './AISettings';
+import { DomainMapping } from './DomainMapping';
 import type { UserData } from './OnboardingFlow';
 import { getArchetypeName } from '../types/archetype';
+import { DOMAINS, type DomainId, type DomainState } from '../types/domains';
 
 interface CockpitProps {
   userData: UserData;
@@ -41,7 +43,7 @@ interface StateSlider {
 
 interface Widget {
   id: string;
-  type: 'vision' | 'intention' | 'streak' | 'loa' | 'traits' | 'paths' | 'bin' | 'empty';
+  type: 'vision' | 'intention' | 'streak' | 'loa' | 'traits' | 'paths' | 'bin' | 'domains' | 'empty';
   position: number;
 }
 
@@ -59,6 +61,7 @@ const WIDGET_TYPES = [
   { type: 'loa', name: 'Quick Chat', icon: MessageCircle },
   { type: 'traits', name: 'My Traits', icon: Brain },
   { type: 'paths', name: 'Active Paths', icon: Target },
+  { type: 'domains', name: 'Life Domains', icon: Hexagon },
   { type: 'bin', name: 'Release Bin', icon: Trash2 },
 ] as const;
 
@@ -95,6 +98,7 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isWidgetPickerOpen, setIsWidgetPickerOpen] = useState(false);
+  const [isDomainsOpen, setIsDomainsOpen] = useState(false);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [binItems, setBinItems] = useState<string[]>([]);
   const [newBinItem, setNewBinItem] = useState('');
@@ -312,6 +316,7 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
                 onRelease={handleReleaseToBin}
                 onRemove={() => handleRemoveWidget(widget.id)}
                 onOpenChat={() => setIsChatOpen(true)}
+                onOpenDomains={() => setIsDomainsOpen(true)}
               />
             ))}
             
@@ -431,6 +436,19 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+
+      {/* Domain Mapping */}
+      {isDomainsOpen && (
+        <DomainMapping
+          onComplete={(domains) => {
+            if (onUpdateUserData) {
+              onUpdateUserData({ domains });
+            }
+            setIsDomainsOpen(false);
+          }}
+          onClose={() => setIsDomainsOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -444,7 +462,8 @@ function WidgetCard({
   setNewBinItem,
   onRelease,
   onRemove,
-  onOpenChat
+  onOpenChat,
+  onOpenDomains
 }: { 
   widget: Widget;
   userData: UserData;
@@ -454,6 +473,7 @@ function WidgetCard({
   onRelease: () => void;
   onRemove: () => void;
   onOpenChat: () => void;
+  onOpenDomains: () => void;
 }) {
   const renderContent = () => {
     switch (widget.type) {
@@ -547,6 +567,46 @@ function WidgetCard({
               ))}
             </AnimatePresence>
           </div>
+        );
+
+      case 'domains':
+        const domains = userData.domains || {};
+        const domainIds: DomainId[] = ['identity', 'relationships', 'wealth', 'body_energy', 'work', 'governance'];
+        const domainColors: Record<DomainId, string> = {
+          identity: '#8b5cf6',
+          relationships: '#ec4899',
+          wealth: '#f59e0b',
+          body_energy: '#10b981',
+          work: '#6366f1',
+          governance: '#14b8a6',
+        };
+        return (
+          <button onClick={onOpenDomains} className="w-full text-left">
+            <Hexagon className="w-5 h-5 mb-2 text-indigo-400" />
+            <p className="text-xs opacity-50 mb-2">Life Domains</p>
+            <div className="space-y-1.5">
+              {domainIds.map(id => {
+                const domain = domains[id];
+                const score = domain?.currentBaseline || 0;
+                return (
+                  <div key={id} className="flex items-center gap-2">
+                    <div 
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium shrink-0"
+                      style={{ 
+                        background: `${domainColors[id]}${score > 0 ? '40' : '15'}`,
+                        border: `1px solid ${domainColors[id]}50`,
+                      }}
+                    >
+                      {score || '?'}
+                    </div>
+                    <span className="text-[10px] opacity-60 truncate">
+                      {DOMAINS[id].name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </button>
         );
 
       default:
