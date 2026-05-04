@@ -16,8 +16,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, Brain, Eye, Heart, Flame, Target,
   MessageCircle, Settings, Trash2, Plus,
-  Sparkles, Sun, Moon, Star, Hexagon
+  Sparkles, Sun, Moon, Star, Hexagon,
+  Calendar, CheckCircle2, Circle, Rocket, HelpCircle
 } from 'lucide-react';
+import aiService from '../services/aiService';
 import { LoaCompanion } from './LoaCompanion';
 import { LoaChat } from './LoaChat';
 import { AISettings } from './AISettings';
@@ -43,7 +45,7 @@ interface StateSlider {
 
 interface Widget {
   id: string;
-  type: 'vision' | 'intention' | 'streak' | 'loa' | 'traits' | 'paths' | 'bin' | 'domains' | 'empty';
+  type: 'vision' | 'intention' | 'streak' | 'loa' | 'traits' | 'paths' | 'bin' | 'domains' | 'today' | 'playbook' | 'loa-today' | 'empty';
   position: number;
 }
 
@@ -55,6 +57,9 @@ const DEFAULT_SLIDERS: StateSlider[] = [
 ];
 
 const WIDGET_TYPES = [
+  { type: 'today', name: 'Today', icon: Calendar },
+  { type: 'playbook', name: 'Playbook', icon: Rocket },
+  { type: 'loa-today', name: "Loa's Advice", icon: HelpCircle },
   { type: 'vision', name: 'My Vision', icon: Star },
   { type: 'intention', name: 'Core Intention', icon: Flame },
   { type: 'streak', name: 'Streak', icon: Zap },
@@ -477,6 +482,15 @@ function WidgetCard({
 }) {
   const renderContent = () => {
     switch (widget.type) {
+      case 'today':
+        return <TodayWidget />;
+
+      case 'playbook':
+        return <PlaybookWidget />;
+
+      case 'loa-today':
+        return <LoaTodayWidget userData={userData} />;
+
       case 'intention':
         return (
           <div className="text-center">
@@ -697,6 +711,280 @@ function ActivePathsList({ compact = false }: { compact?: boolean }) {
           <Plus className="w-4 h-4" />
         </button>
       </div>
+    </div>
+  );
+}
+
+// Today Widget - Quick task management
+interface Task {
+  id: string;
+  text: string;
+  done: boolean;
+  createdAt: string;
+}
+
+function TodayWidget() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [newTask, setNewTask] = useState('');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('awake_today_tasks');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Only load today's tasks
+      const today = new Date().toDateString();
+      const todayTasks = parsed.filter((t: Task) => 
+        new Date(t.createdAt).toDateString() === today
+      );
+      setTasks(todayTasks);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('awake_today_tasks', JSON.stringify(tasks));
+  }, [tasks]);
+
+  const addTask = () => {
+    if (!newTask.trim()) return;
+    const task: Task = {
+      id: `task-${Date.now()}`,
+      text: newTask.trim(),
+      done: false,
+      createdAt: new Date().toISOString(),
+    };
+    setTasks([...tasks, task]);
+    setNewTask('');
+  };
+
+  const toggleTask = (id: string) => {
+    setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  };
+
+  const completedCount = tasks.filter(t => t.done).length;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-blue-400" />
+          <span className="text-xs opacity-50">Today</span>
+        </div>
+        {tasks.length > 0 && (
+          <span className="text-[10px] opacity-40">{completedCount}/{tasks.length}</span>
+        )}
+      </div>
+      
+      <div className="space-y-1.5 max-h-[120px] overflow-y-auto mb-2">
+        {tasks.length === 0 ? (
+          <p className="text-xs opacity-30">No tasks yet</p>
+        ) : (
+          tasks.map(task => (
+            <button
+              key={task.id}
+              onClick={() => toggleTask(task.id)}
+              className="flex items-center gap-2 w-full text-left group"
+            >
+              {task.done ? (
+                <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+              ) : (
+                <Circle className="w-4 h-4 opacity-30 group-hover:opacity-60 shrink-0" />
+              )}
+              <span className={`text-xs truncate ${task.done ? 'line-through opacity-40' : ''}`}>
+                {task.text}
+              </span>
+            </button>
+          ))
+        )}
+      </div>
+
+      <div className="flex gap-1">
+        <input
+          type="text"
+          value={newTask}
+          onChange={(e) => setNewTask(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addTask()}
+          placeholder="Add task..."
+          className="flex-1 p-1.5 text-[10px] rounded-lg bg-black/30 border border-white/10 focus:outline-none focus:border-blue-400/50"
+        />
+        <button 
+          onClick={addTask}
+          className="px-2 rounded-lg bg-blue-400/10 hover:bg-blue-400/20 transition-colors"
+        >
+          <Plus className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Playbook Widget - Current project + daily levers
+function PlaybookWidget() {
+  const [playbook, setPlaybook] = useState<{
+    project: string;
+    levers: { id: string; text: string; done: boolean }[];
+  } | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('awake_playbook');
+    if (saved) setPlaybook(JSON.parse(saved));
+  }, []);
+
+  const toggleLever = (id: string) => {
+    if (!playbook) return;
+    const updated = {
+      ...playbook,
+      levers: playbook.levers.map(l => 
+        l.id === id ? { ...l, done: !l.done } : l
+      ),
+    };
+    setPlaybook(updated);
+    localStorage.setItem('awake_playbook', JSON.stringify(updated));
+  };
+
+  if (!playbook || !playbook.project) {
+    return (
+      <div className="text-center">
+        <Rocket className="w-6 h-6 mx-auto mb-2 text-purple-400" />
+        <p className="text-xs opacity-50 mb-1">Playbook</p>
+        <p className="text-[10px] opacity-30">No active project</p>
+        <p className="text-[10px] opacity-20 mt-1">Set up in full Playbook</p>
+      </div>
+    );
+  }
+
+  const completedLevers = playbook.levers.filter(l => l.done).length;
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <Rocket className="w-5 h-5 text-purple-400" />
+        <span className="text-xs font-medium truncate">{playbook.project}</span>
+      </div>
+      
+      <div className="space-y-1.5">
+        {playbook.levers.slice(0, 4).map(lever => (
+          <button
+            key={lever.id}
+            onClick={() => toggleLever(lever.id)}
+            className="flex items-center gap-2 w-full text-left group"
+          >
+            {lever.done ? (
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0" />
+            ) : (
+              <Circle className="w-3.5 h-3.5 opacity-30 group-hover:opacity-60 shrink-0" />
+            )}
+            <span className={`text-[10px] truncate ${lever.done ? 'line-through opacity-40' : ''}`}>
+              {lever.text}
+            </span>
+          </button>
+        ))}
+      </div>
+      
+      {playbook.levers.length > 0 && (
+        <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
+          <div 
+            className="h-full bg-purple-400 transition-all"
+            style={{ width: `${(completedLevers / playbook.levers.length) * 100}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Loa Today Widget - Get daily guidance
+function LoaTodayWidget({ userData }: { userData: UserData }) {
+  const [advice, setAdvice] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastAsked, setLastAsked] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('awake_loa_today');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const today = new Date().toDateString();
+      if (parsed.date === today) {
+        setAdvice(parsed.advice);
+        setLastAsked(parsed.date);
+      }
+    }
+  }, []);
+
+  const askLoa = async () => {
+    setIsLoading(true);
+    try {
+      // Gather context
+      const tasks = JSON.parse(localStorage.getItem('awake_today_tasks') || '[]');
+      const paths = JSON.parse(localStorage.getItem('awake_active_paths') || '[]');
+      const playbook = JSON.parse(localStorage.getItem('awake_playbook') || 'null');
+      const sliders = JSON.parse(localStorage.getItem('awake_cockpit_sliders') || '[]');
+      
+      const energySlider = sliders.find((s: any) => s.id === 'energy');
+      const focusSlider = sliders.find((s: any) => s.id === 'focus');
+
+      const prompt = `Based on where I am right now, what should I focus on today?
+
+My current state:
+- Energy: ${energySlider?.value || 50}/100
+- Focus: ${focusSlider?.value || 50}/100
+${userData.intention ? `- My intention: "${userData.intention}"` : ''}
+
+My active paths: ${paths.map((p: any) => p.title).join(', ') || 'None set'}
+${playbook?.project ? `Current project: ${playbook.project}` : ''}
+Today's tasks: ${tasks.filter((t: any) => !t.done).map((t: any) => t.text).join(', ') || 'None yet'}
+
+Give me ONE clear priority for today. Be specific and direct. 2-3 sentences max.`;
+
+      const response = await aiService.chatWithContext(prompt, userData);
+      setAdvice(response);
+      
+      const today = new Date().toDateString();
+      setLastAsked(today);
+      localStorage.setItem('awake_loa_today', JSON.stringify({ date: today, advice: response }));
+    } catch (err) {
+      console.error('Failed to get Loa advice:', err);
+      setAdvice("Focus on what feels most alive right now. Start there.");
+    }
+    setIsLoading(false);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <LoaCompanion size={20} />
+        <span className="text-xs opacity-50">Loa's Advice</span>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-4">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          >
+            <Sparkles className="w-5 h-5 text-primary" />
+          </motion.div>
+        </div>
+      ) : advice ? (
+        <div>
+          <p className="text-[11px] leading-relaxed opacity-80">{advice}</p>
+          <button
+            onClick={askLoa}
+            className="text-[10px] opacity-40 hover:opacity-60 mt-2 transition-opacity"
+          >
+            Ask again
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={askLoa}
+          className="w-full py-3 rounded-lg text-xs hover:bg-white/5 transition-colors"
+          style={{
+            border: '1px dashed rgba(255,255,255,0.2)',
+          }}
+        >
+          What should I focus on?
+        </button>
+      )}
     </div>
   );
 }
