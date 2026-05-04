@@ -823,11 +823,19 @@ function PlaybookWidget() {
     project: string;
     levers: { id: string; text: string; done: boolean }[];
   } | null>(null);
+  const [isSetup, setIsSetup] = useState(false);
+  const [newProject, setNewProject] = useState('');
+  const [newLever, setNewLever] = useState('');
 
   useEffect(() => {
     const saved = localStorage.getItem('awake_playbook');
     if (saved) setPlaybook(JSON.parse(saved));
   }, []);
+
+  const savePlaybook = (updated: typeof playbook) => {
+    setPlaybook(updated);
+    localStorage.setItem('awake_playbook', JSON.stringify(updated));
+  };
 
   const toggleLever = (id: string) => {
     if (!playbook) return;
@@ -837,17 +845,74 @@ function PlaybookWidget() {
         l.id === id ? { ...l, done: !l.done } : l
       ),
     };
-    setPlaybook(updated);
-    localStorage.setItem('awake_playbook', JSON.stringify(updated));
+    savePlaybook(updated);
   };
 
-  if (!playbook || !playbook.project) {
+  const startProject = () => {
+    if (!newProject.trim()) return;
+    savePlaybook({
+      project: newProject.trim(),
+      levers: [],
+    });
+    setNewProject('');
+    setIsSetup(false);
+  };
+
+  const addLever = () => {
+    if (!newLever.trim() || !playbook) return;
+    const updated = {
+      ...playbook,
+      levers: [...playbook.levers, {
+        id: `lever-${Date.now()}`,
+        text: newLever.trim(),
+        done: false,
+      }],
+    };
+    savePlaybook(updated);
+    setNewLever('');
+  };
+
+  const clearProject = () => {
+    localStorage.removeItem('awake_playbook');
+    setPlaybook(null);
+  };
+
+  // Setup mode
+  if (isSetup || (!playbook?.project)) {
     return (
-      <div className="text-center">
-        <Rocket className="w-6 h-6 mx-auto mb-2 text-purple-400" />
-        <p className="text-xs opacity-50 mb-1">Playbook</p>
-        <p className="text-[10px] opacity-30">No active project</p>
-        <p className="text-[10px] opacity-20 mt-1">Set up in full Playbook</p>
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Rocket className="w-5 h-5 text-purple-400" />
+          <span className="text-xs opacity-50">New Project</span>
+        </div>
+        <input
+          type="text"
+          value={newProject}
+          onChange={(e) => setNewProject(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && startProject()}
+          placeholder="What's your focus project?"
+          className="w-full p-2 text-xs rounded-lg bg-black/30 border border-white/10 focus:outline-none focus:border-purple-400/50 mb-2"
+          autoFocus
+        />
+        <button
+          onClick={startProject}
+          disabled={!newProject.trim()}
+          className="w-full py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-30"
+          style={{
+            background: newProject.trim() ? 'rgba(147, 51, 234, 0.2)' : 'transparent',
+            border: '1px solid rgba(147, 51, 234, 0.3)',
+          }}
+        >
+          Start Project
+        </button>
+        {playbook?.project && (
+          <button
+            onClick={() => setIsSetup(false)}
+            className="w-full text-[10px] opacity-40 hover:opacity-60 mt-2"
+          >
+            Cancel
+          </button>
+        )}
       </div>
     );
   }
@@ -856,13 +921,22 @@ function PlaybookWidget() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-2">
-        <Rocket className="w-5 h-5 text-purple-400" />
-        <span className="text-xs font-medium truncate">{playbook.project}</span>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Rocket className="w-5 h-5 text-purple-400 shrink-0" />
+          <span className="text-xs font-medium truncate">{playbook.project}</span>
+        </div>
+        <button
+          onClick={clearProject}
+          className="opacity-30 hover:opacity-60 transition-opacity shrink-0"
+          title="Clear project"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
       </div>
       
-      <div className="space-y-1.5">
-        {playbook.levers.slice(0, 4).map(lever => (
+      <div className="space-y-1.5 max-h-[80px] overflow-y-auto">
+        {playbook.levers.map(lever => (
           <button
             key={lever.id}
             onClick={() => toggleLever(lever.id)}
@@ -878,6 +952,24 @@ function PlaybookWidget() {
             </span>
           </button>
         ))}
+      </div>
+
+      {/* Add lever input */}
+      <div className="flex gap-1 mt-2">
+        <input
+          type="text"
+          value={newLever}
+          onChange={(e) => setNewLever(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addLever()}
+          placeholder="Add daily lever..."
+          className="flex-1 p-1.5 text-[10px] rounded-lg bg-black/30 border border-white/10 focus:outline-none focus:border-purple-400/50"
+        />
+        <button 
+          onClick={addLever}
+          className="px-2 rounded-lg bg-purple-400/10 hover:bg-purple-400/20 transition-colors"
+        >
+          <Plus className="w-3 h-3" />
+        </button>
       </div>
       
       {playbook.levers.length > 0 && (
