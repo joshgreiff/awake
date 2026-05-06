@@ -20,10 +20,12 @@ import {
   Calendar, CheckCircle2, Circle, Rocket, HelpCircle
 } from 'lucide-react';
 import aiService from '../services/aiService';
+import { triggerSmallCelebration } from '../utils/confetti';
 import { LoaCompanion } from './LoaCompanion';
 import { LoaChat } from './LoaChat';
 import { AISettings } from './AISettings';
 import { DomainMapping } from './DomainMapping';
+import { DailyRitual } from './DailyRitual';
 import type { UserData } from './OnboardingFlow';
 import { getArchetypeName } from '../types/archetype';
 import { DOMAINS, type DomainId, type DomainState } from '../types/domains';
@@ -104,11 +106,30 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isWidgetPickerOpen, setIsWidgetPickerOpen] = useState(false);
   const [isDomainsOpen, setIsDomainsOpen] = useState(false);
+  const [isRitualOpen, setIsRitualOpen] = useState(false);
+  const [todayRitual, setTodayRitual] = useState<{ energy: number; desire: string; loaMessage: string } | null>(null);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [binItems, setBinItems] = useState<string[]>([]);
   const [newBinItem, setNewBinItem] = useState('');
 
   const userName = userData.identity?.name || 'Traveler';
+
+  // Check if ritual was done today
+  useEffect(() => {
+    const history = JSON.parse(localStorage.getItem('awake_ritual_history') || '[]');
+    if (history.length > 0) {
+      const latest = history[0];
+      const today = new Date().toDateString();
+      const ritualDate = new Date(latest.date).toDateString();
+      if (ritualDate === today) {
+        setTodayRitual({
+          energy: latest.energy,
+          desire: latest.desire,
+          loaMessage: latest.loaMessage,
+        });
+      }
+    }
+  }, []);
   const archetype = userData.archetype;
   const archetypeName = archetype ? getArchetypeName(archetype) : null;
 
@@ -158,12 +179,34 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
     return 'Good evening';
   };
 
+  const getLoaGreeting = () => {
+    const hour = new Date().getHours();
+    const greetings = hour < 12 
+      ? [
+          `${userName}, you're already here. That's the first win.`,
+          `New day, clean slate. What wants to happen today?`,
+          `I'm glad you showed up. Let's make this count.`,
+        ]
+      : hour < 17 
+      ? [
+          `Still here, still showing up. I see you.`,
+          `How's the day unfolding? I'm here if you need me.`,
+          `Checking in — you're doing better than you think.`,
+        ]
+      : [
+          `Winding down? Take a breath. You made it through.`,
+          `Evening check-in. What went well today?`,
+          `The day's almost done. Be gentle with yourself.`,
+        ];
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  };
+
   return (
     <div className="min-h-screen p-4 md:p-6" style={{ 
       background: 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0a0a0f 100%)'
     }}>
       {/* Header */}
-      <header className="flex items-center justify-between mb-6">
+      <header className="flex items-center justify-between mb-4">
         <div>
           <p className="text-xs opacity-50 uppercase tracking-widest">Awake Console</p>
           <h1 className="text-xl font-medium">{getTimeGreeting()}, {userName}</h1>
@@ -177,6 +220,50 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
           </button>
         </div>
       </header>
+
+      {/* Daily Ritual CTA */}
+      {!todayRitual ? (
+        <motion.button
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          onClick={() => setIsRitualOpen(true)}
+          className="w-full mb-6 p-4 rounded-2xl flex items-center justify-center gap-3 hover:scale-[1.01] transition-transform"
+          style={{
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(20, 184, 166, 0.15))',
+            border: '2px solid rgba(99, 102, 241, 0.3)',
+          }}
+        >
+          <Sun className="w-5 h-5 text-amber-400" />
+          <span className="font-medium">Start My Day</span>
+          <span className="text-xs opacity-50">60 seconds</span>
+        </motion.button>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mb-6 p-3 rounded-xl flex items-center justify-between"
+          style={{
+            background: 'rgba(16, 185, 129, 0.1)',
+            border: '1px solid rgba(16, 185, 129, 0.2)',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            <div>
+              <p className="text-sm font-medium">Day started</p>
+              {todayRitual.desire && (
+                <p className="text-xs opacity-60 truncate max-w-[200px]">"{todayRitual.desire}"</p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setIsRitualOpen(true)}
+            className="text-xs opacity-50 hover:opacity-100 transition-opacity"
+          >
+            Do again
+          </button>
+        </motion.div>
+      )}
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -292,12 +379,31 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
               )}
             </div>
 
+            {/* Loa Greeting */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="mt-6 p-3 rounded-xl text-center max-w-xs mx-auto"
+              style={{
+                background: 'rgba(99, 102, 241, 0.05)',
+                border: '1px solid rgba(99, 102, 241, 0.1)',
+              }}
+            >
+              <p className="text-sm opacity-70 italic">
+                {todayRitual 
+                  ? `"${todayRitual.loaMessage.slice(0, 80)}${todayRitual.loaMessage.length > 80 ? '...' : ''}"`
+                  : getLoaGreeting()
+                }
+              </p>
+            </motion.div>
+
             {/* Talk to Loa button */}
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsChatOpen(true)}
-              className="mt-6 px-6 py-3 rounded-full flex items-center gap-2 mx-auto"
+              className="mt-4 px-6 py-3 rounded-full flex items-center gap-2 mx-auto"
               style={{
                 background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(20, 184, 166, 0.2))',
                 border: '1px solid rgba(99, 102, 241, 0.3)',
@@ -454,6 +560,17 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
           onClose={() => setIsDomainsOpen(false)}
         />
       )}
+
+      {/* Daily Ritual */}
+      <DailyRitual
+        userData={userData}
+        isOpen={isRitualOpen}
+        onClose={() => setIsRitualOpen(false)}
+        onComplete={(energy, desire, loaMessage) => {
+          setTodayRitual({ energy, desire, loaMessage });
+          setIsRitualOpen(false);
+        }}
+      />
     </div>
   );
 }
@@ -757,6 +874,10 @@ function TodayWidget() {
   };
 
   const toggleTask = (id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (task && !task.done) {
+      triggerSmallCelebration();
+    }
     setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
   };
 
@@ -839,6 +960,10 @@ function PlaybookWidget() {
 
   const toggleLever = (id: string) => {
     if (!playbook) return;
+    const lever = playbook.levers.find(l => l.id === id);
+    if (lever && !lever.done) {
+      triggerSmallCelebration();
+    }
     const updated = {
       ...playbook,
       levers: playbook.levers.map(l => 
