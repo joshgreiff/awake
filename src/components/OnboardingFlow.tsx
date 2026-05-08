@@ -36,6 +36,8 @@ export interface UserData {
     };
   };
   intention?: string;
+  vision?: string;
+  antiVision?: string;
   archetype?: {
     cognitiveOrientation: string;
     primaryDriver: string;

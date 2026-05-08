@@ -428,6 +428,7 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
                 onRemove={() => handleRemoveWidget(widget.id)}
                 onOpenChat={() => setIsChatOpen(true)}
                 onOpenDomains={() => setIsDomainsOpen(true)}
+                onUpdateUserData={onUpdateUserData}
               />
             ))}
             
@@ -585,7 +586,8 @@ function WidgetCard({
   onRelease,
   onRemove,
   onOpenChat,
-  onOpenDomains
+  onOpenDomains,
+  onUpdateUserData
 }: { 
   widget: Widget;
   userData: UserData;
@@ -596,7 +598,10 @@ function WidgetCard({
   onRemove: () => void;
   onOpenChat: () => void;
   onOpenDomains: () => void;
+  onUpdateUserData?: (data: Partial<UserData>) => void;
 }) {
+  const [isEditingVision, setIsEditingVision] = useState(false);
+  const [visionDraft, setVisionDraft] = useState(userData.vision || '');
   const renderContent = () => {
     switch (widget.type) {
       case 'today':
@@ -622,16 +627,52 @@ function WidgetCard({
         );
 
       case 'vision':
+        if (isEditingVision) {
+          return (
+            <div>
+              <Star className="w-5 h-5 mb-2 text-amber-400" />
+              <p className="text-xs opacity-50 mb-1">My Vision</p>
+              <textarea
+                value={visionDraft}
+                onChange={(e) => setVisionDraft(e.target.value)}
+                placeholder="What do you want your life to look like?"
+                className="w-full p-2 text-xs rounded-lg bg-black/30 border border-white/10 focus:outline-none focus:border-amber-400/50 resize-none"
+                rows={3}
+                autoFocus
+              />
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => {
+                    onUpdateUserData?.({ vision: visionDraft });
+                    setIsEditingVision(false);
+                  }}
+                  className="flex-1 py-1 text-xs rounded-lg bg-amber-400/20 hover:bg-amber-400/30 transition-colors"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setVisionDraft(userData.vision || '');
+                    setIsEditingVision(false);
+                  }}
+                  className="px-3 py-1 text-xs rounded-lg opacity-50 hover:opacity-100 transition-opacity"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          );
+        }
         return (
-          <div>
+          <button onClick={() => setIsEditingVision(true)} className="w-full text-left">
             <Star className="w-5 h-5 mb-2 text-amber-400" />
-            <p className="text-xs opacity-50 mb-1">Vision</p>
+            <p className="text-xs opacity-50 mb-1">My Vision</p>
             {userData.vision ? (
               <p className="text-xs opacity-70 line-clamp-3">{userData.vision}</p>
             ) : (
-              <p className="text-xs opacity-30">Not set</p>
+              <p className="text-xs opacity-30 italic">Tap to set your vision...</p>
             )}
-          </div>
+          </button>
         );
 
       case 'loa':
@@ -644,12 +685,28 @@ function WidgetCard({
         );
 
       case 'streak':
-        const sessions = JSON.parse(localStorage.getItem('awake_sessions') || '[]');
+        const ritualHistory = JSON.parse(localStorage.getItem('awake_ritual_history') || '[]');
+        const oldSessions = JSON.parse(localStorage.getItem('awake_sessions') || '[]');
+        const totalSessions = ritualHistory.length + oldSessions.length;
+        
+        // Calculate streak (consecutive days)
+        let streak = 0;
+        const today = new Date();
+        for (let i = 0; i < ritualHistory.length; i++) {
+          const ritualDate = new Date(ritualHistory[i].date);
+          const dayDiff = Math.floor((today.getTime() - ritualDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (dayDiff === streak) {
+            streak++;
+          } else {
+            break;
+          }
+        }
+        
         return (
           <div className="text-center">
             <Zap className="w-6 h-6 mx-auto mb-2 text-yellow-400" />
-            <p className="text-2xl font-bold">{sessions.length}</p>
-            <p className="text-xs opacity-50">Sessions</p>
+            <p className="text-2xl font-bold">{streak > 0 ? streak : totalSessions}</p>
+            <p className="text-xs opacity-50">{streak > 0 ? 'Day Streak' : 'Sessions'}</p>
           </div>
         );
 
@@ -881,7 +938,17 @@ function TodayWidget() {
     setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
   };
 
+  const deleteTask = (id: string) => {
+    setTasks(tasks.filter(t => t.id !== id));
+  };
+
   const completedCount = tasks.filter(t => t.done).length;
+  
+  // Sort: incomplete first, then completed
+  const sortedTasks = [...tasks].sort((a, b) => {
+    if (a.done === b.done) return 0;
+    return a.done ? 1 : -1;
+  });
 
   return (
     <div>
@@ -896,24 +963,34 @@ function TodayWidget() {
       </div>
       
       <div className="space-y-1.5 max-h-[120px] overflow-y-auto mb-2">
-        {tasks.length === 0 ? (
+        {sortedTasks.length === 0 ? (
           <p className="text-xs opacity-30">No tasks yet</p>
         ) : (
-          tasks.map(task => (
-            <button
+          sortedTasks.map(task => (
+            <div
               key={task.id}
-              onClick={() => toggleTask(task.id)}
-              className="flex items-center gap-2 w-full text-left group"
+              className="flex items-center gap-2 w-full group"
             >
-              {task.done ? (
-                <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
-              ) : (
-                <Circle className="w-4 h-4 opacity-30 group-hover:opacity-60 shrink-0" />
-              )}
-              <span className={`text-xs truncate ${task.done ? 'line-through opacity-40' : ''}`}>
-                {task.text}
-              </span>
-            </button>
+              <button
+                onClick={() => toggleTask(task.id)}
+                className="flex items-center gap-2 flex-1 text-left min-w-0"
+              >
+                {task.done ? (
+                  <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+                ) : (
+                  <Circle className="w-4 h-4 opacity-30 group-hover:opacity-60 shrink-0" />
+                )}
+                <span className={`text-xs truncate ${task.done ? 'line-through opacity-40' : ''}`}>
+                  {task.text}
+                </span>
+              </button>
+              <button
+                onClick={() => deleteTask(task.id)}
+                className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-opacity shrink-0"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
           ))
         )}
       </div>
