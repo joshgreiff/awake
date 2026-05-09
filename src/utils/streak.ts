@@ -39,13 +39,42 @@ export function collectActiveDays(): Set<string> {
     dayKeyFromISO((item as { date?: string }).date || '')
   );
 
-  addFrom(localStorage.getItem('awake_reflections'), (item) =>
-    dayKeyFromISO((item as { date?: string }).date || '')
-  );
+  addFrom(localStorage.getItem('awake_reflections'), (item) => {
+    const r = item as { date?: string; createdAt?: string; timestamp?: string };
+    return dayKeyFromISO(r.date || r.createdAt || r.timestamp || '');
+  });
 
   addFrom(localStorage.getItem('awake_sessions'), (item) =>
     dayKeyFromISO((item as { timestamp?: string }).timestamp || '')
   );
+
+  // Daily Reflection also writes lastDate as toDateString() — count that day even if the array entry is missing/old shape
+  try {
+    const raw = localStorage.getItem('awake_reflection_streak');
+    if (raw) {
+      const { count, lastDate } = JSON.parse(raw) as { count?: number; lastDate?: string };
+      if (count && count > 0 && lastDate) {
+        const d = new Date(lastDate);
+        if (!Number.isNaN(d.getTime())) days.add(localDateKey(d));
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // "Loa's advice for today" counts as a check-in for that calendar day
+  try {
+    const raw = localStorage.getItem('awake_loa_today');
+    if (raw) {
+      const { date } = JSON.parse(raw) as { date?: string };
+      if (date) {
+        const d = new Date(date);
+        if (!Number.isNaN(d.getTime())) days.add(localDateKey(d));
+      }
+    }
+  } catch {
+    /* ignore */
+  }
 
   return days;
 }
