@@ -63,13 +63,17 @@ export function DailyRitual({ userData, isOpen, onClose, onComplete }: DailyRitu
   const generateLoaResponse = async (userDesire: string) => {
     setIsLoading(true);
     try {
+      const toneRules = `
+
+Tone rules (strict): Use their name "${userName}" sparingly if at all. Never use pet names, terms of endearment ("my loves", "buddy", "sweetie"), or influencer / "manifestation bro" clichés. Sound like a grounded friend: direct, human, not performative.`;
+
       const prompt = userDesire 
         ? `${userName} just started their day. Their energy is ${energy}/10 (${getEnergyLabel(energy)}). When asked what they want today, they said: "${userDesire}"
 
-Give them a brief, warm response (2-3 sentences). Acknowledge where they're at, validate what they want, and give them one grounding thought or small encouragement. Speak like you're their higher self checking in. End with something that makes them feel ready to start.`
+Give them a brief, warm response (2-3 sentences). Acknowledge where they're at, validate what they want, and give them one grounding thought or small encouragement. Speak like you're their higher self checking in. End with something that makes them feel ready to start.${toneRules}`
         : `${userName} just started their day. Their energy is ${energy}/10 (${getEnergyLabel(energy)}). They didn't specify what they want today - maybe they're still figuring it out.
 
-Give them a brief, warm response (2-3 sentences). Meet them where they are. If energy is low, be gentle. If high, match that energy. Remind them it's okay to not have everything figured out. Speak like you're their higher self. End with something grounding.`;
+Give them a brief, warm response (2-3 sentences). Meet them where they are. If energy is low, be gentle. If high, match that energy. Remind them it's okay to not have everything figured out. Speak like you're their higher self. End with something grounding.${toneRules}`;
 
       const response = await aiService.chatWithContext(prompt, userData);
       setLoaMessage(response);

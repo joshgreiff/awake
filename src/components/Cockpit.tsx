@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import aiService from '../services/aiService';
 import { triggerSmallCelebration } from '../utils/confetti';
+import { computeAwakeDayStreak, collectActiveDays } from '../utils/streak';
 import { LoaCompanion } from './LoaCompanion';
 import { LoaChat } from './LoaChat';
 import { AISettings } from './AISettings';
@@ -692,31 +693,20 @@ function WidgetCard({
           </button>
         );
 
-      case 'streak':
-        const ritualHistory = JSON.parse(localStorage.getItem('awake_ritual_history') || '[]');
-        const oldSessions = JSON.parse(localStorage.getItem('awake_sessions') || '[]');
-        const totalSessions = ritualHistory.length + oldSessions.length;
-        
-        // Calculate streak (consecutive days)
-        let streak = 0;
-        const today = new Date();
-        for (let i = 0; i < ritualHistory.length; i++) {
-          const ritualDate = new Date(ritualHistory[i].date);
-          const dayDiff = Math.floor((today.getTime() - ritualDate.getTime()) / (1000 * 60 * 60 * 24));
-          if (dayDiff === streak) {
-            streak++;
-          } else {
-            break;
-          }
-        }
-        
+      case 'streak': {
+        const dayStreak = computeAwakeDayStreak();
+        const totalActiveDays = collectActiveDays().size;
         return (
           <div className="text-center">
             <Zap className="w-6 h-6 mx-auto mb-2 text-yellow-400" />
-            <p className="text-2xl font-bold">{streak > 0 ? streak : totalSessions}</p>
-            <p className="text-xs opacity-50">{streak > 0 ? 'Day Streak' : 'Sessions'}</p>
+            <p className="text-2xl font-bold">{dayStreak}</p>
+            <p className="text-xs opacity-50">Day streak</p>
+            {dayStreak === 0 && totalActiveDays > 0 && (
+              <p className="text-[9px] opacity-35 mt-1 px-1">Ritual, reflection, or check-in today or yesterday to continue</p>
+            )}
           </div>
         );
+      }
 
       case 'traits':
         const archetype = userData.archetype;
