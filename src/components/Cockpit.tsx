@@ -17,7 +17,7 @@ import {
   Zap, Brain, Eye, Heart, Flame, Target,
   MessageCircle, Settings, Trash2, Plus,
   Sparkles, Sun, Moon, Star, Hexagon,
-  Calendar, CheckCircle2, Circle, Rocket, HelpCircle
+  Calendar, CheckCircle2, Circle, Rocket, HelpCircle, LogOut
 } from 'lucide-react';
 import aiService from '../services/aiService';
 import { triggerSmallCelebration } from '../utils/confetti';
@@ -211,12 +211,20 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
           <p className="text-xs opacity-50 uppercase tracking-widest">Awake Console</p>
           <h1 className="text-xl font-medium">{getTimeGreeting()}, {userName}</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button 
             onClick={() => setIsSettingsOpen(true)}
             className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+            title="Settings"
           >
             <Settings className="w-5 h-5 opacity-50" />
+          </button>
+          <button 
+            onClick={onReset}
+            className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+            title="Log out"
+          >
+            <LogOut className="w-5 h-5 opacity-50" />
           </button>
         </div>
       </header>
@@ -311,12 +319,12 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
             <h2 className="text-xs uppercase tracking-widest opacity-50 mb-3">System Status</h2>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="opacity-50">Sessions</span>
-                <span>{JSON.parse(localStorage.getItem('awake_sessions') || '[]').length}</span>
+                <span className="opacity-50">Rituals</span>
+                <span>{JSON.parse(localStorage.getItem('awake_ritual_history') || '[]').length}</span>
               </div>
               <div className="flex justify-between">
-                <span className="opacity-50">Reflections</span>
-                <span>{JSON.parse(localStorage.getItem('awake_reflections') || '[]').length}</span>
+                <span className="opacity-50">Tasks Done</span>
+                <span>{JSON.parse(localStorage.getItem('awake_today_tasks') || '[]').filter((t: any) => t.done).length}</span>
               </div>
             </div>
           </div>
