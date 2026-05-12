@@ -137,6 +137,9 @@ export default function App() {
   // Handle partial user data updates (like archetype)
   const handleUpdateUserData = async (partialData: Partial<UserData>) => {
     const updated = { ...userData, ...partialData } as UserData;
+    if (partialData.identity) {
+      updated.identity = { ...(userData?.identity || {}), ...partialData.identity } as UserData['identity'];
+    }
     setUserData(updated);
     try {
       await userDataService.save(updated);

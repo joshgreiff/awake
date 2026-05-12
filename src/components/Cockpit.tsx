@@ -17,7 +17,7 @@ import {
   Zap, Brain, Eye, Heart, Flame, Target,
   MessageCircle, Settings, Trash2, Plus,
   Sparkles, Sun, Moon, Star, Hexagon,
-  Calendar, CheckCircle2, Circle, Rocket, HelpCircle, LogOut
+  Calendar, CheckCircle2, Circle, Rocket, HelpCircle, LogOut, UserRound, X
 } from 'lucide-react';
 import aiService from '../services/aiService';
 import { triggerSmallCelebration } from '../utils/confetti';
@@ -27,6 +27,7 @@ import { LoaChat } from './LoaChat';
 import { AISettings } from './AISettings';
 import { DomainMapping } from './DomainMapping';
 import { DailyRitual } from './DailyRitual';
+import { Button } from './ui/button';
 import type { UserData } from './OnboardingFlow';
 import { getArchetypeName } from '../types/archetype';
 import { DOMAINS, type DomainId, type DomainState } from '../types/domains';
@@ -112,8 +113,18 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [binItems, setBinItems] = useState<string[]>([]);
   const [newBinItem, setNewBinItem] = useState('');
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profilePronouns, setProfilePronouns] = useState('');
 
   const userName = userData.identity?.name || 'Traveler';
+
+  useEffect(() => {
+    if (isProfileOpen) {
+      setProfileName(userData.identity?.name || '');
+      setProfilePronouns(userData.identity?.pronouns || '');
+    }
+  }, [isProfileOpen, userData.identity?.name, userData.identity?.pronouns]);
 
   // Check if ritual was done today
   useEffect(() => {
@@ -213,6 +224,13 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
           <h1 className="text-xl font-medium">{getTimeGreeting()}, {userName}</h1>
         </div>
         <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setIsProfileOpen(true)}
+            className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+            title="Profile & display name"
+          >
+            <UserRound className="w-5 h-5 opacity-50" />
+          </button>
           <button 
             onClick={() => setIsSettingsOpen(true)}
             className="p-2 rounded-lg hover:bg-white/5 transition-colors"
@@ -581,6 +599,91 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
           setIsRitualOpen(false);
         }}
       />
+
+      {/* Profile — updates Supabase when signed in (console edits get overwritten on load) */}
+      <AnimatePresence>
+        {isProfileOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
+            onClick={() => setIsProfileOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 16 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 16 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm p-6 rounded-2xl"
+              style={{
+                background: 'linear-gradient(135deg, #1a1a2e, #0a0a0f)',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium">Profile</h2>
+                <button
+                  type="button"
+                  onClick={() => setIsProfileOpen(false)}
+                  className="p-1 rounded-lg opacity-50 hover:opacity-100"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mb-4">
+                When you&apos;re signed in, this saves to your account so it syncs across devices.
+              </p>
+              <label className="block text-xs uppercase tracking-widest opacity-50 mb-1">Display name</label>
+              <input
+                type="text"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-primary/50 mb-4"
+                placeholder="Josh"
+                autoComplete="name"
+              />
+              <label className="block text-xs uppercase tracking-widest opacity-50 mb-1">Pronouns (optional)</label>
+              <input
+                type="text"
+                value={profilePronouns}
+                onChange={(e) => setProfilePronouns(e.target.value)}
+                className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-primary/50 mb-4"
+                placeholder="he/him"
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  type="button"
+                  onClick={() => setIsProfileOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  type="button"
+                  disabled={!profileName.trim() || !onUpdateUserData}
+                  onClick={() => {
+                    const name = profileName.trim();
+                    if (!name || !onUpdateUserData) return;
+                    onUpdateUserData({
+                      identity: {
+                        name,
+                        pronouns: profilePronouns.trim() || userData.identity?.pronouns || 'they/them',
+                      },
+                    });
+                    setIsProfileOpen(false);
+                  }}
+                >
+                  Save
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
