@@ -307,14 +307,14 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
+        className="fixed inset-0 z-50 overflow-x-hidden overflow-y-auto bg-black/80 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="absolute inset-4 md:inset-8 lg:inset-16 bg-gradient-to-br from-[#1a1025] to-[#0a0514] rounded-2xl border border-primary/20 flex flex-row overflow-hidden relative"
+          className="absolute left-2 right-2 top-2 bottom-3 sm:left-4 sm:right-4 sm:top-4 sm:bottom-4 md:inset-8 lg:inset-12 mx-auto max-w-[min(100%,1600px)] w-full min-h-0 min-w-0 max-h-[min(100dvh-1rem,100vh-1rem)] bg-gradient-to-br from-[#1a1025] to-[#0a0514] rounded-2xl border border-primary/20 flex flex-row overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {sidebarOpen && (
@@ -327,7 +327,7 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
           )}
 
           <aside
-            className={`absolute md:static inset-y-0 left-0 z-20 md:z-0 flex w-[min(100%,18rem)] flex-col border-r border-primary/20 bg-[#120a1a] md:bg-transparent shrink-0 ${
+            className={`absolute md:static inset-y-0 left-0 z-20 md:z-0 flex w-[min(100%,16rem)] sm:w-56 flex-col shrink-0 border-r border-primary/20 bg-[#120a1a] md:bg-transparent min-h-0 overflow-hidden ${
               sidebarOpen ? 'flex' : 'hidden md:flex'
             }`}
           >
@@ -369,10 +369,10 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
             </div>
           </aside>
 
-          <div className="flex flex-1 flex-col min-h-0 min-w-0 relative z-[5] md:min-w-[200px]">
+          <div className="relative z-[5] flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-primary/20 shrink-0">
-              <div className="flex items-center gap-2 min-w-0">
+            <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-b border-primary/20 p-3 sm:p-4">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -388,11 +388,11 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
                   <p className="text-xs text-muted-foreground truncate">{activeConv?.title || 'Chat'}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="hidden md:inline-flex text-muted-foreground hover:text-foreground h-9 px-2"
+                  className="hidden h-9 px-2 text-muted-foreground hover:text-foreground md:inline-flex"
                   onClick={startNewChat}
                 >
                   <MessageSquarePlus className="w-4 h-4" />
@@ -444,7 +444,7 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
             </div>
 
             {!isConfigured && (
-              <div className="flex-1 flex items-center justify-center p-8">
+              <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-x-hidden p-6 sm:p-8">
                 <div className="text-center max-w-md">
                   <LoaCompanion size={80} animated={false} />
                   <h3 className="text-xl font-semibold mt-4 mb-2">Set Up AI Connection</h3>
@@ -461,27 +461,29 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
             )}
 
             {isConfigured && (
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+              <div className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden p-3 sm:p-4">
                 {messages.map((message) => (
                   <motion.div
                     key={message.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex w-full min-w-0 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                        message.role === 'user' ? 'bg-primary/20 text-foreground ml-8' : 'bg-secondary/10 text-foreground mr-8'
+                      className={`max-w-[min(100%,20rem)] rounded-2xl px-3 py-2.5 sm:max-w-[85%] sm:px-4 sm:py-3 ${
+                        message.role === 'user' ? 'bg-primary/20 text-foreground' : 'bg-secondary/10 text-foreground'
                       }`}
                     >
                       {message.role === 'assistant' && (
-                        <div className="flex items-center gap-2 mb-1">
-                          <Sparkles className="w-3 h-3 text-primary" />
-                          <span className="text-xs text-primary font-medium">Loa</span>
+                        <div className="mb-1 flex items-center gap-2">
+                          <Sparkles className="h-3 w-3 shrink-0 text-primary" />
+                          <span className="text-xs font-medium text-primary">Loa</span>
                         </div>
                       )}
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1 opacity-50">
+                      <p className="break-words text-sm leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap">
+                        {message.content}
+                      </p>
+                      <p className="mt-1 text-[10px] text-muted-foreground opacity-50">
                         {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
@@ -489,8 +491,8 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
                 ))}
 
                 {isLoading && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                    <div className="bg-secondary/10 rounded-2xl px-4 py-3 mr-8">
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex min-w-0 justify-start">
+                    <div className="max-w-[min(100%,20rem)] rounded-2xl bg-secondary/10 px-4 py-3 sm:max-w-[85%]">
                       <div className="flex items-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin text-primary" />
                         <span className="text-sm text-muted-foreground">Loa is thinking...</span>
@@ -506,8 +508,8 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
             )}
 
             {isConfigured && (
-              <div className="p-4 border-t border-primary/20 shrink-0">
-                <div className="flex gap-2">
+              <div className="min-w-0 shrink-0 border-t border-primary/20 p-3 sm:p-4">
+                <div className="flex min-w-0 gap-2">
                   <textarea
                     ref={inputRef}
                     value={input}
@@ -515,7 +517,7 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
                     onKeyDown={handleKeyDown}
                     placeholder="Talk to Loa..."
                     rows={1}
-                    className="flex-1 bg-background/50 border border-primary/20 rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="min-h-0 min-w-0 flex-1 resize-none rounded-xl border border-primary/20 bg-background/50 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 sm:px-4 sm:py-3"
                     disabled={isLoading}
                   />
                   <Button onClick={sendMessage} disabled={!input.trim() || isLoading} className="px-4">
