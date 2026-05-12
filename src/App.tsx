@@ -6,6 +6,7 @@ import { OnboardingFlow, type UserData } from './components/OnboardingFlow';
 import { Cockpit } from './components/Cockpit';
 import { AuthModal } from './components/AuthModal';
 import { auth, userData as userDataService, isSupabaseConfigured } from './services/supabase';
+import { LOA_CHATS_STORAGE_KEY } from './utils/loaChatStorage';
 import type { User } from '@supabase/supabase-js';
 
 type ViewMode = 'landing' | 'onboarding' | 'dashboard';
@@ -113,7 +114,7 @@ export default function App() {
   const handleReset = async () => {
     localStorage.removeItem('awake_user_data');
     localStorage.removeItem('awake_onboarding_progress');
-    localStorage.removeItem('awake_chat_history');
+    localStorage.removeItem(LOA_CHATS_STORAGE_KEY);
     
     // Sign out if logged in
     if (user) {
@@ -139,6 +140,9 @@ export default function App() {
     const updated = { ...userData, ...partialData } as UserData;
     if (partialData.identity) {
       updated.identity = { ...(userData?.identity || {}), ...partialData.identity } as UserData['identity'];
+    }
+    if (partialData.cockpitSync !== undefined) {
+      updated.cockpitSync = partialData.cockpitSync;
     }
     setUserData(updated);
     try {

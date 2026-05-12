@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import type { UserData } from './OnboardingFlow';
+import { notifyCockpitLocalChanged } from '../utils/cockpitCloudSync';
 
 interface PlaybookProps {
   userData: UserData;
@@ -103,6 +104,7 @@ export function Playbook({ userData, isOpen, onClose, onSave }: PlaybookProps) {
   const savePlaybook = (updated: PlaybookData) => {
     setPlaybook(updated);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    notifyCockpitLocalChanged();
     onSave(updated);
   };
 

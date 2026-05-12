@@ -16,6 +16,7 @@ import { Button } from './ui/button';
 import { LoaCompanion } from './LoaCompanion';
 import type { UserData } from './OnboardingFlow';
 import aiService from '../services/aiService';
+import { notifyCockpitLocalChanged } from '../utils/cockpitCloudSync';
 
 interface DailyRitualProps {
   userData: UserData;
@@ -107,7 +108,8 @@ Give them a brief, warm response (2-3 sentences). Meet them where they are. If e
       s.id === 'energy' ? { ...s, value: energy * 10 } : s
     );
     localStorage.setItem('awake_cockpit_sliders', JSON.stringify(updatedSliders));
-    
+    notifyCockpitLocalChanged();
+
     // Reset for next time
     setTimeout(() => {
       setPhase('energy');

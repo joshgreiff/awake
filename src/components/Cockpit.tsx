@@ -11,7 +11,7 @@
  * - Visual actions = real actions
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, Brain, Eye, Heart, Flame, Target,
@@ -22,6 +22,11 @@ import {
 import aiService from '../services/aiService';
 import { triggerSmallCelebration } from '../utils/confetti';
 import { computeAwakeDayStreak, collectActiveDays } from '../utils/streak';
+import {
+  buildCockpitSyncSnapshot,
+  COCKPIT_SYNC_EVENT,
+  notifyCockpitLocalChanged,
+} from '../utils/cockpitCloudSync';
 import { LoaCompanion } from './LoaCompanion';
 import { LoaChat } from './LoaChat';
 import { AISettings } from './AISettings';
@@ -118,6 +123,8 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
   const [profilePronouns, setProfilePronouns] = useState('');
 
   const userName = userData.identity?.name || 'Traveler';
+  const archetype = userData.archetype;
+  const archetypeName = archetype ? getArchetypeName(archetype) : null;
 
   useEffect(() => {
     if (isProfileOpen) {
@@ -142,8 +149,6 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
       }
     }
   }, []);
-  const archetype = userData.archetype;
-  const archetypeName = archetype ? getArchetypeName(archetype) : null;
 
   // Save sliders when they change (only save serializable data)
   useEffect(() => {
@@ -155,6 +160,27 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
   useEffect(() => {
     localStorage.setItem('awake_cockpit_widgets', JSON.stringify(widgets));
   }, [widgets]);
+
+  /** Push cockpit localStorage snapshot into userData (Supabase) — debounced */
+  const cockpitSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleCockpitCloudSync = useCallback(() => {
+    if (!onUpdateUserData) return;
+    if (cockpitSyncTimerRef.current) clearTimeout(cockpitSyncTimerRef.current);
+    cockpitSyncTimerRef.current = setTimeout(() => {
+      cockpitSyncTimerRef.current = null;
+      onUpdateUserData({ cockpitSync: buildCockpitSyncSnapshot() });
+    }, 2000);
+  }, [onUpdateUserData]);
+
+  useEffect(() => {
+    const onLocal = () => scheduleCockpitCloudSync();
+    window.addEventListener(COCKPIT_SYNC_EVENT, onLocal);
+    return () => window.removeEventListener(COCKPIT_SYNC_EVENT, onLocal);
+  }, [scheduleCockpitCloudSync]);
+
+  useEffect(() => {
+    scheduleCockpitCloudSync();
+  }, [sliders, widgets, scheduleCockpitCloudSync]);
 
   const handleSliderChange = (id: string, value: number) => {
     setSliders(prev => prev.map(s => s.id === id ? { ...s, value } : s));
@@ -939,6 +965,7 @@ function ActivePathsList({ compact = false }: { compact?: boolean }) {
     setPaths(updated);
     localStorage.setItem('awake_active_paths', JSON.stringify(updated));
     setNewPath('');
+    notifyCockpitLocalChanged();
   };
 
   if (compact) {
@@ -1017,6 +1044,7 @@ function TodayWidget() {
 
   useEffect(() => {
     localStorage.setItem('awake_today_tasks', JSON.stringify(tasks));
+    notifyCockpitLocalChanged();
   }, [tasks]);
 
   const addTask = () => {
@@ -1134,6 +1162,7 @@ function PlaybookWidget() {
   const savePlaybook = (updated: typeof playbook) => {
     setPlaybook(updated);
     localStorage.setItem('awake_playbook', JSON.stringify(updated));
+    notifyCockpitLocalChanged();
   };
 
   const toggleLever = (id: string) => {
@@ -1178,6 +1207,7 @@ function PlaybookWidget() {
   const clearProject = () => {
     localStorage.removeItem('awake_playbook');
     setPlaybook(null);
+    notifyCockpitLocalChanged();
   };
 
   // Setup mode
@@ -1336,6 +1366,7 @@ Give me ONE clear priority for today. Be specific and direct. 2-3 sentences max.
       const today = new Date().toDateString();
       setLastAsked(today);
       localStorage.setItem('awake_loa_today', JSON.stringify({ date: today, advice: response }));
+      notifyCockpitLocalChanged();
     } catch (err) {
       console.error('Failed to get Loa advice:', err);
       setAdvice("Focus on what feels most alive right now. Start there.");

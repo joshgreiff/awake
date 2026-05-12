@@ -6,6 +6,7 @@ import { OnboardingArchetype } from './onboarding/OnboardingArchetype';
 import { OnboardingDomains } from './onboarding/OnboardingDomains';
 import { PromiseToSelf } from './onboarding/PromiseToSelf';
 import { DashboardUnlock } from './onboarding/DashboardUnlock';
+import type { CockpitSyncState } from '../types/cockpitSync';
 
 interface OnboardingFlowProps {
   onComplete: (userData: UserData) => void;
@@ -38,6 +39,8 @@ export interface UserData {
   intention?: string;
   vision?: string;
   antiVision?: string;
+  /** Synced cockpit + habits when signed in (see utils/cockpitCloudSync) */
+  cockpitSync?: CockpitSyncState;
   archetype?: {
     cognitiveOrientation: string;
     primaryDriver: string;

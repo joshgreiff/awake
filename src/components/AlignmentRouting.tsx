@@ -17,6 +17,7 @@ import { LoaCompanion } from './LoaCompanion';
 import type { UserData } from './OnboardingFlow';
 import type { SessionState } from './StateCheckIn';
 import aiService from '../services/aiService';
+import { notifyCockpitLocalChanged } from '../utils/cockpitCloudSync';
 
 interface AlignmentRoutingProps {
   userData: UserData;
@@ -60,6 +61,7 @@ export function AlignmentRouting({ userData, session, isOpen, onClose, onComplet
   const savePaths = (newPaths: ActivePath[]) => {
     setPaths(newPaths);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newPaths));
+    notifyCockpitLocalChanged();
   };
 
   const addPath = () => {

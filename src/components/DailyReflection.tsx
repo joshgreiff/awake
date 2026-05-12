@@ -17,6 +17,7 @@ import type { UserData } from './OnboardingFlow';
 import aiService from '../services/aiService';
 import { DOMAINS, type DomainId } from '../types/domains';
 import { DEVELOPMENTAL_STATES } from '../types/archetype';
+import { notifyCockpitLocalChanged } from '../utils/cockpitCloudSync';
 
 interface DailyReflectionProps {
   userData: UserData;
@@ -183,6 +184,7 @@ Provide a brief, insightful response (2-3 sentences max). Name what you see - th
       count: newStreak,
       lastDate: new Date().toDateString(),
     }));
+    notifyCockpitLocalChanged();
 
     onSaveReflection(entry);
     onClose();

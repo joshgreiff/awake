@@ -17,6 +17,7 @@ import { X, ArrowRight, Sparkles, Compass, Heart } from 'lucide-react';
 import { Button } from './ui/button';
 import { LoaCompanion } from './LoaCompanion';
 import type { UserData } from './OnboardingFlow';
+import { notifyCockpitLocalChanged } from '../utils/cockpitCloudSync';
 
 interface StateCheckInProps {
   userData: UserData;
@@ -109,6 +110,7 @@ export function StateCheckIn({ userData, isOpen, onClose, onComplete }: StateChe
     const sessions = JSON.parse(localStorage.getItem('awake_sessions') || '[]');
     sessions.unshift(session);
     localStorage.setItem('awake_sessions', JSON.stringify(sessions.slice(0, 100)));
+    notifyCockpitLocalChanged();
 
     onComplete(session, mode);
   };

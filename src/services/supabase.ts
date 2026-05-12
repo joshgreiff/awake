@@ -9,6 +9,13 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { UserData } from '../components/OnboardingFlow';
+import { applyCockpitSyncToLocalStorage, buildCockpitSyncSnapshot, notifyCockpitLocalChanged } from '../utils/cockpitCloudSync';
+import {
+  appendMessageToActiveLoaChat,
+  parseLoaChatsStorage,
+  persistLoaChats,
+  LOA_CHATS_STORAGE_KEY,
+} from '../utils/loaChatStorage';
 
 // These will be replaced with your actual Supabase credentials
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
@@ -104,8 +111,12 @@ export const auth = {
 export const userData = {
   // Save user data (creates or updates)
   async save(data: UserData) {
+    const payload: UserData = {
+      ...data,
+      cockpitSync: data.cockpitSync ?? buildCockpitSyncSnapshot(),
+    };
     // Always save to localStorage first (guaranteed to work)
-    localStorage.setItem('awake_user_data', JSON.stringify(data));
+    localStorage.setItem('awake_user_data', JSON.stringify(payload));
     
     const user = await auth.getUser();
     if (!user) {
@@ -118,7 +129,7 @@ export const userData = {
         .from('profiles')
         .upsert({
           id: user.id,
-          user_data: data,
+          user_data: payload,
           updated_at: new Date().toISOString(),
         });
 
@@ -139,7 +150,11 @@ export const userData = {
     if (!user) {
       // Not logged in - try localStorage
       const local = localStorage.getItem('awake_user_data');
-      return local ? JSON.parse(local) : null;
+      const parsed = local ? JSON.parse(local) : null;
+      if (parsed?.cockpitSync) {
+        applyCockpitSyncToLocalStorage(parsed.cockpitSync);
+      }
+      return parsed;
     }
 
     const { data, error } = await supabase
@@ -151,12 +166,17 @@ export const userData = {
     if (error) {
       // Fall back to localStorage
       const local = localStorage.getItem('awake_user_data');
-      return local ? JSON.parse(local) : null;
+      const parsed = local ? JSON.parse(local) : null;
+      if (parsed?.cockpitSync) {
+        applyCockpitSyncToLocalStorage(parsed.cockpitSync);
+      }
+      return parsed;
     }
 
     // Update localStorage with cloud data
     if (data?.user_data) {
       localStorage.setItem('awake_user_data', JSON.stringify(data.user_data));
+      applyCockpitSyncToLocalStorage(data.user_data.cockpitSync);
     }
 
     return data?.user_data || null;
@@ -171,7 +191,9 @@ export const userData = {
     if (!local) return;
 
     const localData = JSON.parse(local);
-    
+    // Attach latest cockpit keys so first sign-in uploads rituals/tasks/widgets too
+    localData.cockpitSync = buildCockpitSyncSnapshot();
+
     // Check if cloud has data
     const { data: cloudData } = await supabase
       .from('profiles')
@@ -180,7 +202,7 @@ export const userData = {
       .single();
 
     if (!cloudData?.user_data) {
-      // Cloud is empty, upload local data
+      // Cloud is empty, upload local data (includes cockpit snapshot)
       await this.save(localData);
     }
     // If cloud has data, it takes precedence (already loaded)
@@ -195,16 +217,14 @@ export const chatHistory = {
   async saveMessage(role: 'user' | 'assistant', content: string) {
     const user = await auth.getUser();
     if (!user) {
-      // Not logged in - save to localStorage
-      const local = localStorage.getItem('awake_chat_history');
-      const messages = local ? JSON.parse(local) : [];
-      messages.push({
+      const raw = localStorage.getItem(LOA_CHATS_STORAGE_KEY);
+      const state = parseLoaChatsStorage(raw);
+      const next = appendMessageToActiveLoaChat(state, {
         id: `${Date.now()}`,
         role,
         content,
-        timestamp: new Date().toISOString(),
       });
-      localStorage.setItem('awake_chat_history', JSON.stringify(messages.slice(-100)));
+      persistLoaChats(next);
       return;
     }
 
@@ -224,8 +244,17 @@ export const chatHistory = {
     const user = await auth.getUser();
     
     if (!user) {
-      const local = localStorage.getItem('awake_chat_history');
-      return local ? JSON.parse(local).slice(-limit) : [];
+      const raw = localStorage.getItem(LOA_CHATS_STORAGE_KEY);
+      const state = parseLoaChatsStorage(raw);
+      const active = state.conversations.find((c) => c.id === state.activeId);
+      const msgs = active?.messages.slice(-limit) ?? [];
+      return msgs.map((m) => ({
+        id: m.id,
+        user_id: '',
+        role: m.role,
+        content: m.content,
+        created_at: m.timestamp,
+      })) as ChatMessage[];
     }
 
     const { data, error } = await supabase
@@ -236,8 +265,17 @@ export const chatHistory = {
       .limit(limit);
 
     if (error) {
-      const local = localStorage.getItem('awake_chat_history');
-      return local ? JSON.parse(local).slice(-limit) : [];
+      const raw = localStorage.getItem(LOA_CHATS_STORAGE_KEY);
+      const state = parseLoaChatsStorage(raw);
+      const active = state.conversations.find((c) => c.id === state.activeId);
+      const msgs = active?.messages.slice(-limit) ?? [];
+      return msgs.map((m) => ({
+        id: m.id,
+        user_id: '',
+        role: m.role,
+        content: m.content,
+        created_at: m.timestamp,
+      })) as ChatMessage[];
     }
 
     return data?.reverse() || [];
@@ -247,8 +285,9 @@ export const chatHistory = {
   async clear() {
     const user = await auth.getUser();
     
-    localStorage.removeItem('awake_chat_history');
-    
+    localStorage.removeItem(LOA_CHATS_STORAGE_KEY);
+    notifyCockpitLocalChanged();
+
     if (user) {
       await supabase
         .from('chat_messages')

@@ -25,6 +25,7 @@ import {
   getArchetypeName 
 } from '../types/archetype';
 import { DOMAINS, type DomainId, type DomainState, calculateOverallAlignment } from '../types/domains';
+import { notifyCockpitLocalChanged } from '../utils/cockpitCloudSync';
 
 interface DashboardProps {
   userData: UserData;
@@ -86,6 +87,7 @@ export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProp
     const existingReflections = JSON.parse(localStorage.getItem('awake_reflections') || '[]');
     const updated = [reflection, ...existingReflections].slice(0, 100);
     localStorage.setItem('awake_reflections', JSON.stringify(updated));
+    notifyCockpitLocalChanged();
   };
 
   // Get reflection streak
