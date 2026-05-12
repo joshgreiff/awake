@@ -35,7 +35,7 @@ import { DailyRitual } from './DailyRitual';
 import { Button } from './ui/button';
 import type { UserData } from './OnboardingFlow';
 import { getArchetypeName } from '../types/archetype';
-import { DOMAINS, type DomainId, type DomainState } from '../types/domains';
+import { DOMAINS, type DomainId, calculateOverallAlignment } from '../types/domains';
 
 interface CockpitProps {
   userData: UserData;
@@ -126,6 +126,30 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
   const archetype = userData.archetype;
   const archetypeName = archetype ? getArchetypeName(archetype) : null;
 
+  /** Stable per mount — do not call Math.random() in render (causes layout jump on every re-render). */
+  const [loaGreetingLine] = useState(() => {
+    const hour = new Date().getHours();
+    const greetings =
+      hour < 12
+        ? [
+            `${userName}, you're already here. That's the first win.`,
+            `New day, clean slate. What wants to happen today?`,
+            `I'm glad you showed up. Let's make this count.`,
+          ]
+        : hour < 17
+          ? [
+              `Still here, still showing up. I see you.`,
+              `How's the day unfolding? I'm here if you need me.`,
+              `Checking in — you're doing better than you think.`,
+            ]
+          : [
+              `Winding down? Take a breath. You made it through.`,
+              `Evening check-in. What went well today?`,
+              `The day's almost done. Be gentle with yourself.`,
+            ];
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  });
+
   useEffect(() => {
     if (isProfileOpen) {
       setProfileName(userData.identity?.name || '');
@@ -215,28 +239,6 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
-  };
-
-  const getLoaGreeting = () => {
-    const hour = new Date().getHours();
-    const greetings = hour < 12 
-      ? [
-          `${userName}, you're already here. That's the first win.`,
-          `New day, clean slate. What wants to happen today?`,
-          `I'm glad you showed up. Let's make this count.`,
-        ]
-      : hour < 17 
-      ? [
-          `Still here, still showing up. I see you.`,
-          `How's the day unfolding? I'm here if you need me.`,
-          `Checking in — you're doing better than you think.`,
-        ]
-      : [
-          `Winding down? Take a breath. You made it through.`,
-          `Evening check-in. What went well today?`,
-          `The day's almost done. Be gentle with yourself.`,
-        ];
-    return greetings[Math.floor(Math.random() * greetings.length)];
   };
 
   return (
@@ -444,10 +446,9 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
               }}
             >
               <p className="text-sm opacity-70 italic">
-                {todayRitual 
+                {todayRitual
                   ? `"${todayRitual.loaMessage.slice(0, 80)}${todayRitual.loaMessage.length > 80 ? '...' : ''}"`
-                  : getLoaGreeting()
-                }
+                  : loaGreetingLine}
               </p>
             </motion.div>
 
@@ -468,7 +469,7 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
           </motion.div>
 
           {/* Widget Grid */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 auto-rows-[10.25rem] gap-3 [contain:layout] sm:auto-rows-[11.25rem] sm:gap-3">
             {widgets.map(widget => (
               <WidgetCard 
                 key={widget.id} 
@@ -486,18 +487,18 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
             ))}
             
             {/* Add Widget Button */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
+            <button
+              type="button"
               onClick={() => setIsWidgetPickerOpen(true)}
-              className="p-6 rounded-2xl flex flex-col items-center justify-center gap-2 min-h-[120px]"
+              className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-2 rounded-2xl p-4 transition-colors hover:bg-white/[0.04]"
               style={{
                 background: 'rgba(255,255,255,0.02)',
                 border: '2px dashed rgba(255,255,255,0.1)',
               }}
             >
-              <Plus className="w-6 h-6 opacity-30" />
+              <Plus className="h-6 w-6 opacity-30" />
               <span className="text-xs opacity-30">Add Widget</span>
-            </motion.button>
+            </button>
           </div>
         </div>
 
@@ -743,21 +744,33 @@ function WidgetCard({
   const renderContent = () => {
     switch (widget.type) {
       case 'today':
-        return <TodayWidget />;
+        return (
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <TodayWidget />
+          </div>
+        );
 
       case 'playbook':
-        return <PlaybookWidget />;
+        return (
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <PlaybookWidget />
+          </div>
+        );
 
       case 'loa-today':
-        return <LoaTodayWidget userData={userData} />;
+        return (
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <LoaTodayWidget userData={userData} />
+          </div>
+        );
 
       case 'intention':
         return (
-          <div className="text-center">
-            <Flame className="w-6 h-6 mx-auto mb-2 text-orange-400" />
-            <p className="text-xs opacity-50 mb-1">Core Intention</p>
+          <div className="flex h-full min-h-0 flex-col text-center">
+            <Flame className="mx-auto mb-2 h-6 w-6 shrink-0 text-orange-400" />
+            <p className="mb-1 shrink-0 text-xs opacity-50">Core Intention</p>
             {userData.intention ? (
-              <p className="text-sm italic">"{userData.intention}"</p>
+              <p className="line-clamp-4 min-h-0 text-sm italic leading-snug">"{userData.intention}"</p>
             ) : (
               <p className="text-xs opacity-30">Not set</p>
             )}
@@ -767,18 +780,18 @@ function WidgetCard({
       case 'vision':
         if (isEditingVision) {
           return (
-            <div>
-              <Star className="w-5 h-5 mb-2 text-amber-400" />
-              <p className="text-xs opacity-50 mb-1">My Vision</p>
+            <div className="flex h-full min-h-0 flex-col overflow-hidden">
+              <Star className="mb-1 h-5 w-5 shrink-0 text-amber-400" />
+              <p className="mb-1 shrink-0 text-xs opacity-50">My Vision</p>
               <textarea
                 value={visionDraft}
                 onChange={(e) => setVisionDraft(e.target.value)}
                 placeholder="What do you want your life to look like?"
-                className="w-full p-2 text-xs rounded-lg bg-black/30 border border-white/10 focus:outline-none focus:border-amber-400/50 resize-none"
+                className="min-h-0 w-full flex-1 resize-none rounded-lg border border-white/10 bg-black/30 p-2 text-xs focus:border-amber-400/50 focus:outline-none"
                 rows={3}
                 autoFocus
               />
-              <div className="flex gap-2 mt-2">
+              <div className="mt-2 flex shrink-0 gap-2">
                 <button
                   onClick={() => {
                     onUpdateUserData?.({ vision: visionDraft });
@@ -802,22 +815,22 @@ function WidgetCard({
           );
         }
         return (
-          <button onClick={() => setIsEditingVision(true)} className="w-full text-left">
-            <Star className="w-5 h-5 mb-2 text-amber-400" />
-            <p className="text-xs opacity-50 mb-1">My Vision</p>
+          <button type="button" onClick={() => setIsEditingVision(true)} className="flex h-full min-h-0 w-full flex-col overflow-hidden text-left">
+            <Star className="mb-2 h-5 w-5 shrink-0 text-amber-400" />
+            <p className="mb-1 shrink-0 text-xs opacity-50">My Vision</p>
             {userData.vision ? (
-              <p className="text-xs opacity-70 line-clamp-3">{userData.vision}</p>
+              <p className="line-clamp-4 min-h-0 text-xs leading-relaxed opacity-70">{userData.vision}</p>
             ) : (
-              <p className="text-xs opacity-30 italic">Tap to set your vision...</p>
+              <p className="text-xs italic opacity-30">Tap to set your vision...</p>
             )}
           </button>
         );
 
       case 'loa':
         return (
-          <button onClick={onOpenChat} className="w-full text-left">
+          <button type="button" onClick={onOpenChat} className="flex h-full min-h-0 w-full flex-col overflow-hidden text-left">
             <LoaCompanion size={32} />
-            <p className="text-sm font-medium mt-2">Quick Chat</p>
+            <p className="mt-2 shrink-0 text-sm font-medium">Quick Chat</p>
             <p className="text-xs opacity-50">Talk to Loa</p>
           </button>
         );
@@ -826,12 +839,12 @@ function WidgetCard({
         const dayStreak = computeAwakeDayStreak();
         const totalActiveDays = collectActiveDays().size;
         return (
-          <div className="text-center">
-            <Zap className="w-6 h-6 mx-auto mb-2 text-yellow-400" />
-            <p className="text-2xl font-bold">{dayStreak}</p>
+          <div className="flex h-full min-h-0 flex-col items-center justify-center overflow-hidden text-center">
+            <Zap className="mb-2 h-6 w-6 shrink-0 text-yellow-400" />
+            <p className="text-2xl font-bold leading-none">{dayStreak}</p>
             <p className="text-xs opacity-50">Day streak</p>
             {dayStreak === 0 && totalActiveDays > 0 && (
-              <p className="text-[9px] opacity-35 mt-1 px-1">Ritual, reflection, or check-in today or yesterday to continue</p>
+              <p className="mt-1 line-clamp-2 px-1 text-[9px] opacity-35">Ritual, reflection, or check-in today or yesterday to continue</p>
             )}
           </div>
         );
@@ -840,11 +853,11 @@ function WidgetCard({
       case 'traits':
         const archetype = userData.archetype;
         return (
-          <div>
-            <Brain className="w-5 h-5 mb-2 text-indigo-400" />
-            <p className="text-xs opacity-50 mb-1">Archetype</p>
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <Brain className="mb-2 h-5 w-5 shrink-0 text-indigo-400" />
+            <p className="mb-1 shrink-0 text-xs opacity-50">Archetype</p>
             {archetype ? (
-              <p className="text-sm">{getArchetypeName(archetype)}</p>
+              <p className="line-clamp-3 text-sm leading-snug">{getArchetypeName(archetype)}</p>
             ) : (
               <p className="text-xs opacity-30">Discover yours</p>
             )}
@@ -852,21 +865,26 @@ function WidgetCard({
         );
 
       case 'paths':
-        return <ActivePathsList compact />;
+        return (
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <ActivePathsList compact />
+          </div>
+        );
 
       case 'bin':
         return (
-          <div>
-            <Trash2 className="w-5 h-5 mb-2 text-rose-400" />
-            <p className="text-xs opacity-50 mb-2">Release Bin</p>
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <Trash2 className="mb-2 h-5 w-5 shrink-0 text-rose-400" />
+            <p className="mb-2 shrink-0 text-xs opacity-50">Release Bin</p>
             <input
               type="text"
               value={newBinItem}
               onChange={(e) => setNewBinItem(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && onRelease()}
               placeholder="Let go of..."
-              className="w-full p-2 text-xs rounded-lg bg-black/30 border border-white/10 focus:outline-none focus:border-rose-400/50"
+              className="w-full shrink-0 rounded-lg border border-white/10 bg-black/30 p-2 text-xs focus:border-rose-400/50 focus:outline-none"
             />
+            <div className="relative mt-1 min-h-0 flex-1 overflow-hidden">
             <AnimatePresence>
               {binItems.map((item, i) => (
                 <motion.div
@@ -875,17 +893,26 @@ function WidgetCard({
                   animate={{ opacity: 0, y: 20, scale: 0.8 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 1.5 }}
-                  className="text-xs mt-2 text-rose-400/50"
+                  className="truncate text-xs text-rose-400/50"
                 >
                   Releasing: {item}
                 </motion.div>
               ))}
             </AnimatePresence>
+            </div>
           </div>
         );
 
-      case 'domains':
-        const domains = userData.domains || {};
+      case 'domains': {
+        const raw = userData.domains || {};
+        let alignment: number | null = null;
+        try {
+          if (raw && typeof raw === 'object' && Object.keys(raw).length > 0) {
+            alignment = calculateOverallAlignment(raw as never);
+          }
+        } catch {
+          alignment = null;
+        }
         const domainIds: DomainId[] = ['identity', 'relationships', 'wealth', 'body_energy', 'work', 'governance'];
         const domainColors: Record<DomainId, string> = {
           identity: '#8b5cf6',
@@ -896,55 +923,74 @@ function WidgetCard({
           governance: '#14b8a6',
         };
         return (
-          <button onClick={onOpenDomains} className="w-full text-left">
-            <Hexagon className="w-5 h-5 mb-2 text-indigo-400" />
-            <p className="text-xs opacity-50 mb-2">Life Domains</p>
-            <div className="space-y-1.5">
-              {domainIds.map(id => {
-                const domain = domains[id];
-                const score = domain?.currentBaseline || 0;
+          <button
+            type="button"
+            onClick={onOpenDomains}
+            title="Average alignment (0–100): how well what you do matches what you want, across domains. Colored digits: where you are today in each area on a 1–10 scale. Open the map to edit."
+            className="flex h-full min-h-0 w-full flex-col items-start gap-1 overflow-hidden text-left"
+          >
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Hexagon className="h-4 w-4 shrink-0 text-indigo-400" />
+              <span className="text-xs opacity-50">Life domains</span>
+            </div>
+            {alignment != null && !Number.isNaN(alignment) && (
+              <div className="flex shrink-0 items-baseline gap-1">
+                <span className="text-lg font-semibold tabular-nums leading-none">{alignment}</span>
+                <span className="text-[10px] opacity-45">/100 avg.</span>
+              </div>
+            )}
+            <p className="line-clamp-2 text-[9px] leading-snug opacity-40">
+              Avg. how aligned your daily actions are with what you want. Each dot is that area today (1–10).
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {domainIds.map((id) => {
+                const domain = raw[id];
+                const score = domain?.currentBaseline ?? 0;
                 return (
-                  <div key={id} className="flex items-center gap-2">
-                    <div 
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium shrink-0"
-                      style={{ 
-                        background: `${domainColors[id]}${score > 0 ? '40' : '15'}`,
-                        border: `1px solid ${domainColors[id]}50`,
-                      }}
-                    >
-                      {score || '?'}
-                    </div>
-                    <span className="text-[10px] opacity-60 truncate">
-                      {DOMAINS[id].name}
-                    </span>
+                  <div
+                    key={id}
+                    title={`${DOMAINS[id].name}: ${score > 0 ? `${score}/10 where you are now` : 'not set yet'}`}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-medium"
+                    style={{
+                      background: `${domainColors[id]}${score > 0 ? '55' : '22'}`,
+                      border: `1px solid ${domainColors[id]}70`,
+                    }}
+                  >
+                    {score > 0 ? score : '·'}
                   </div>
                 );
               })}
             </div>
+            <p className="text-[9px] opacity-35">Tap for full map →</p>
           </button>
         );
+      }
 
       default:
-        return <div className="text-xs opacity-30">Empty widget</div>;
+        return (
+          <div className="flex h-full min-h-0 items-center justify-center overflow-hidden">
+            <p className="text-xs opacity-30">Empty widget</p>
+          </div>
+        );
     }
   };
 
   return (
     <motion.div
-      layout
-      className="relative p-4 rounded-2xl min-h-[120px] group"
+      className="group relative flex h-full min-h-0 max-h-full flex-col overflow-hidden rounded-2xl p-3 sm:p-4"
       style={{
         background: 'rgba(255,255,255,0.03)',
         border: '1px solid rgba(255,255,255,0.08)',
       }}
     >
       <button
+        type="button"
         onClick={onRemove}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-50 hover:opacity-100 transition-opacity"
+        className="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover:opacity-50 hover:opacity-100"
       >
-        <Trash2 className="w-3 h-3" />
+        <Trash2 className="h-3 w-3" />
       </button>
-      {renderContent()}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-0.5">{renderContent()}</div>
     </motion.div>
   );
 }
@@ -970,17 +1016,17 @@ function ActivePathsList({ compact = false }: { compact?: boolean }) {
 
   if (compact) {
     return (
-      <div>
-        <Target className="w-5 h-5 mb-2 text-teal-400" />
-        <p className="text-xs opacity-50 mb-1">Active Paths</p>
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <Target className="mb-2 h-5 w-5 shrink-0 text-teal-400" />
+        <p className="mb-1 shrink-0 text-xs opacity-50">Active Paths</p>
         {paths.length > 0 ? (
-          <div className="space-y-1">
-            {paths.slice(0, 3).map(p => (
-              <p key={p.id} className="text-xs truncate">• {p.title}</p>
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+            {paths.slice(0, 4).map((p) => (
+              <p key={p.id} className="truncate text-xs">
+                • {p.title}
+              </p>
             ))}
-            {paths.length > 3 && (
-              <p className="text-xs opacity-50">+{paths.length - 3} more</p>
-            )}
+            {paths.length > 4 && <p className="shrink-0 text-xs opacity-50">+{paths.length - 4} more</p>}
           </div>
         ) : (
           <p className="text-xs opacity-30">None yet</p>
@@ -1080,18 +1126,20 @@ function TodayWidget() {
   });
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="mb-2 flex shrink-0 items-center justify-between">
         <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-blue-400" />
+          <Calendar className="h-5 w-5 shrink-0 text-blue-400" />
           <span className="text-xs opacity-50">Today</span>
         </div>
         {tasks.length > 0 && (
-          <span className="text-[10px] opacity-40">{completedCount}/{tasks.length}</span>
+          <span className="text-[10px] opacity-40">
+            {completedCount}/{tasks.length}
+          </span>
         )}
       </div>
-      
-      <div className="space-y-1.5 max-h-[120px] overflow-y-auto mb-2">
+
+      <div className="mb-2 min-h-0 flex-1 space-y-1.5 overflow-y-auto">
         {sortedTasks.length === 0 ? (
           <p className="text-xs opacity-30">No tasks yet</p>
         ) : (
@@ -1124,7 +1172,7 @@ function TodayWidget() {
         )}
       </div>
 
-      <div className="flex gap-1">
+      <div className="mt-auto flex shrink-0 gap-1">
         <input
           type="text"
           value={newTask}
@@ -1213,9 +1261,9 @@ function PlaybookWidget() {
   // Setup mode
   if (isSetup || (!playbook?.project)) {
     return (
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Rocket className="w-5 h-5 text-purple-400" />
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div className="mb-2 flex shrink-0 items-center gap-2">
+          <Rocket className="h-5 w-5 text-purple-400" />
           <span className="text-xs opacity-50">New Project</span>
         </div>
         <input
@@ -1224,13 +1272,13 @@ function PlaybookWidget() {
           onChange={(e) => setNewProject(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && startProject()}
           placeholder="What's your focus project?"
-          className="w-full p-2 text-xs rounded-lg bg-black/30 border border-white/10 focus:outline-none focus:border-purple-400/50 mb-2"
+          className="mb-2 w-full shrink-0 rounded-lg border border-white/10 bg-black/30 p-2 text-xs focus:border-purple-400/50 focus:outline-none"
           autoFocus
         />
         <button
           onClick={startProject}
           disabled={!newProject.trim()}
-          className="w-full py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-30"
+          className="w-full shrink-0 rounded-lg py-2 text-xs font-medium transition-colors disabled:opacity-30"
           style={{
             background: newProject.trim() ? 'rgba(147, 51, 234, 0.2)' : 'transparent',
             border: '1px solid rgba(147, 51, 234, 0.3)',
@@ -1253,11 +1301,11 @@ function PlaybookWidget() {
   const completedLevers = playbook.levers.filter(l => l.done).length;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <Rocket className="w-5 h-5 text-purple-400 shrink-0" />
-          <span className="text-xs font-medium truncate">{playbook.project}</span>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Rocket className="h-5 w-5 shrink-0 text-purple-400" />
+          <span className="truncate text-xs font-medium">{playbook.project}</span>
         </div>
         <button
           onClick={clearProject}
@@ -1268,7 +1316,7 @@ function PlaybookWidget() {
         </button>
       </div>
       
-      <div className="space-y-1.5 max-h-[80px] overflow-y-auto">
+      <div className="mb-2 min-h-0 max-h-[3.25rem] flex-1 space-y-1.5 overflow-y-auto">
         {playbook.levers.map(lever => (
           <button
             key={lever.id}
@@ -1288,7 +1336,7 @@ function PlaybookWidget() {
       </div>
 
       {/* Add lever input */}
-      <div className="flex gap-1 mt-2">
+      <div className="mt-auto flex shrink-0 gap-1">
         <input
           type="text"
           value={newLever}
@@ -1306,7 +1354,7 @@ function PlaybookWidget() {
       </div>
       
       {playbook.levers.length > 0 && (
-        <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
+        <div className="mt-1 h-1 shrink-0 overflow-hidden rounded-full bg-white/10">
           <div 
             className="h-full bg-purple-400 transition-all"
             style={{ width: `${(completedLevers / playbook.levers.length) * 100}%` }}
@@ -1375,35 +1423,37 @@ Give me ONE clear priority for today. Be specific and direct. 2-3 sentences max.
   };
 
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-2">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="mb-2 flex shrink-0 items-center gap-2">
         <LoaCompanion size={20} />
         <span className="text-xs opacity-50">Loa's Advice</span>
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-4">
+        <div className="flex flex-1 items-center justify-center py-2">
           <motion.div
             animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
           >
-            <Sparkles className="w-5 h-5 text-primary" />
+            <Sparkles className="h-5 w-5 text-primary" />
           </motion.div>
         </div>
       ) : advice ? (
-        <div>
-          <p className="text-[11px] leading-relaxed opacity-80">{advice}</p>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <p className="line-clamp-5 min-h-0 flex-1 text-[11px] leading-relaxed opacity-80">{advice}</p>
           <button
+            type="button"
             onClick={askLoa}
-            className="text-[10px] opacity-40 hover:opacity-60 mt-2 transition-opacity"
+            className="mt-1 shrink-0 text-[10px] opacity-40 transition-opacity hover:opacity-60"
           >
             Ask again
           </button>
         </div>
       ) : (
         <button
+          type="button"
           onClick={askLoa}
-          className="w-full py-3 rounded-lg text-xs hover:bg-white/5 transition-colors"
+          className="mt-auto w-full shrink-0 rounded-lg py-2 text-xs transition-colors hover:bg-white/5"
           style={{
             border: '1px dashed rgba(255,255,255,0.2)',
           }}

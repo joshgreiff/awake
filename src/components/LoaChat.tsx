@@ -307,16 +307,20 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 overflow-x-hidden overflow-y-auto bg-black/80 backdrop-blur-sm"
+        className="fixed inset-0 z-50 overflow-x-hidden overflow-y-auto bg-black/80 backdrop-blur-sm [scrollbar-gutter:stable]"
         onClick={onClose}
       >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="absolute left-2 right-2 top-2 bottom-3 sm:left-4 sm:right-4 sm:top-4 sm:bottom-4 md:inset-8 lg:inset-12 mx-auto max-w-[min(100%,1600px)] w-full min-h-0 min-w-0 max-h-[min(100dvh-1rem,100vh-1rem)] bg-gradient-to-br from-[#1a1025] to-[#0a0514] rounded-2xl border border-primary/20 flex flex-row overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
+        <div
+          className="flex min-h-[100dvh] w-full max-w-[100vw] flex-col items-center justify-center box-border px-2 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] sm:min-h-screen sm:px-4 sm:py-5 md:px-6"
+          onClick={onClose}
         >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative flex min-h-0 w-full min-w-0 max-w-[min(100%,56rem)] flex-1 flex-col overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-[#1a1025] to-[#0a0514] shadow-2xl sm:max-h-[min(88dvh,52rem)] sm:flex-none md:max-h-[min(90dvh,56rem)] md:flex-row"
+            onClick={(e) => e.stopPropagation()}
+          >
           {sidebarOpen && (
             <button
               type="button"
@@ -371,8 +375,8 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
 
           <div className="relative z-[5] flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-b border-primary/20 p-3 sm:p-4">
-              <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-primary/20 p-3 sm:p-4">
+              <div className="flex min-w-0 max-w-full flex-1 basis-[min(100%,12rem)] items-center gap-2 sm:basis-auto">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -388,7 +392,7 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
                   <p className="text-xs text-muted-foreground truncate">{activeConv?.title || 'Chat'}</p>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 sm:gap-1.5">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -461,7 +465,7 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
             )}
 
             {isConfigured && (
-              <div className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden p-3 sm:p-4">
+              <div className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] p-3 pr-2 sm:p-4 sm:pr-3">
                 {messages.map((message) => (
                   <motion.div
                     key={message.id}
@@ -508,8 +512,8 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
             )}
 
             {isConfigured && (
-              <div className="min-w-0 shrink-0 border-t border-primary/20 p-3 sm:p-4">
-                <div className="flex min-w-0 gap-2">
+              <div className="min-w-0 shrink-0 border-t border-primary/20 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-3 pr-2 pt-3 sm:p-4 sm:pr-3">
+                <div className="flex min-w-0 items-end gap-2">
                   <textarea
                     ref={inputRef}
                     value={input}
@@ -517,10 +521,15 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
                     onKeyDown={handleKeyDown}
                     placeholder="Talk to Loa..."
                     rows={1}
-                    className="min-h-0 min-w-0 flex-1 resize-none rounded-xl border border-primary/20 bg-background/50 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 sm:px-4 sm:py-3"
+                    className="box-border min-h-0 min-w-0 flex-1 resize-none rounded-xl border border-primary/20 bg-background/50 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 sm:px-4 sm:py-3"
                     disabled={isLoading}
                   />
-                  <Button onClick={sendMessage} disabled={!input.trim() || isLoading} className="px-4">
+                  <Button
+                    type="button"
+                    onClick={sendMessage}
+                    disabled={!input.trim() || isLoading}
+                    className="h-10 shrink-0 px-3 sm:h-11 sm:px-4"
+                  >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </Button>
                 </div>
@@ -528,7 +537,8 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
               </div>
             )}
           </div>
-        </motion.div>
+          </motion.div>
+        </div>
       </motion.div>
     </AnimatePresence>
   );
