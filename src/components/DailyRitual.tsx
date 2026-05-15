@@ -9,7 +9,7 @@
  * Makes opening the app feel intentional and grounding.
  */
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, ArrowRight, X, Sun, Heart } from 'lucide-react';
 import { Button } from './ui/button';
@@ -27,6 +27,19 @@ interface DailyRitualProps {
 
 type Phase = 'energy' | 'desire' | 'loa' | 'complete';
 
+/** Map 1..10 so 5 is at 50% track (semantic middle centered), not linear (which centers ~5.5). */
+function energyToVisualPercent(energy: number): number {
+  const e = Math.min(10, Math.max(1, energy));
+  if (e <= 5) return ((e - 1) / 4) * 50;
+  return 50 + ((e - 5) / 5) * 50;
+}
+
+function visualPercentToEnergy(p: number): number {
+  const x = Math.min(100, Math.max(0, p));
+  if (x <= 50) return Math.round(1 + (x / 50) * 4);
+  return Math.round(5 + ((x - 50) / 50) * 5);
+}
+
 export function DailyRitual({ userData, isOpen, onClose, onComplete }: DailyRitualProps) {
   const [phase, setPhase] = useState<Phase>('energy');
   const [energy, setEnergy] = useState(5);
@@ -35,6 +48,8 @@ export function DailyRitual({ userData, isOpen, onClose, onComplete }: DailyRitu
   const [isLoading, setIsLoading] = useState(false);
 
   const userName = userData.identity?.name || 'friend';
+  const energyTrackRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef(false);
 
   const getTimeGreeting = () => {
     const hour = new Date().getHours();
@@ -43,8 +58,44 @@ export function DailyRitual({ userData, isOpen, onClose, onComplete }: DailyRitu
     return 'Good evening';
   };
 
-  /** Match native range thumb position: (value - min) / (max - min), not value/10. */
-  const energyFillPercent = ((energy - 1) / 9) * 100;
+  const setEnergyFromClientX = useCallback((clientX: number) => {
+    const el = energyTrackRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const ratio = (clientX - rect.left) / rect.width;
+    setEnergy(visualPercentToEnergy(ratio * 100));
+  }, []);
+
+  const onEnergyPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      dragRef.current = true;
+      energyTrackRef.current?.setPointerCapture(e.pointerId);
+      setEnergyFromClientX(e.clientX);
+    },
+    [setEnergyFromClientX],
+  );
+
+  const onEnergyPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragRef.current) return;
+      setEnergyFromClientX(e.clientX);
+    },
+    [setEnergyFromClientX],
+  );
+
+  const onEnergyPointerUp = useCallback((e: React.PointerEvent) => {
+    dragRef.current = false;
+    try {
+      energyTrackRef.current?.releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const energyVisualPct = energyToVisualPercent(energy);
+  const energyAccent =
+    energy <= 3 ? '#ef4444' : energy <= 6 ? '#f59e0b' : '#10b981';
 
   const getEnergyLabel = (value: number) => {
     if (value <= 2) return 'Running low';
@@ -158,28 +209,61 @@ Give them a brief, warm response (2-3 sentences). Meet them where they are. If e
               <p className="text-sm text-muted-foreground mb-1">{getTimeGreeting()}, {userName}</p>
               <h2 className="text-xl font-medium mb-8">How's your energy?</h2>
 
-              <div className="mb-4">
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={energy}
-                  onChange={(e) => setEnergy(parseInt(e.target.value))}
-                  className="w-full h-3 rounded-full appearance-none cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, 
-                      ${energy <= 3 ? '#ef4444' : energy <= 6 ? '#f59e0b' : '#10b981'} 0%, 
-                      ${energy <= 3 ? '#ef4444' : energy <= 6 ? '#f59e0b' : '#10b981'} ${energyFillPercent}%, 
-                      rgba(255,255,255,0.1) ${energyFillPercent}%, 
-                      rgba(255,255,255,0.1) 100%)`,
+              <div className="mb-1 px-2.5">
+                <div
+                  ref={energyTrackRef}
+                  role="slider"
+                  aria-valuemin={1}
+                  aria-valuemax={10}
+                  aria-valuenow={energy}
+                  aria-label="Energy level, 1 to 10"
+                  tabIndex={0}
+                  className="relative flex h-10 w-full cursor-pointer touch-none items-center outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgba(10,5,20,0.98)]"
+                  onPointerDown={onEnergyPointerDown}
+                  onPointerMove={onEnergyPointerMove}
+                  onPointerUp={onEnergyPointerUp}
+                  onPointerCancel={onEnergyPointerUp}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setEnergy((v) => Math.max(1, v - 1));
+                    } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setEnergy((v) => Math.min(10, v + 1));
+                    } else if (e.key === 'Home') {
+                      e.preventDefault();
+                      setEnergy(1);
+                    } else if (e.key === 'End') {
+                      e.preventDefault();
+                      setEnergy(10);
+                    }
                   }}
-                />
+                >
+                  <div className="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full transition-[width] duration-75 ease-out"
+                      style={{
+                        width: `${energyVisualPct}%`,
+                        backgroundColor: energyAccent,
+                      }}
+                    />
+                  </div>
+                  <div
+                    className="pointer-events-none absolute top-1/2 z-10 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md ring-2 ring-primary/30"
+                    style={{ left: `${energyVisualPct}%` }}
+                  />
+                </div>
               </div>
 
-              <div className="flex justify-between text-xs text-muted-foreground mb-2">
-                <span>1</span>
-                <span className="font-medium text-foreground">{energy}</span>
-                <span>10</span>
+              <div className="relative mb-2 h-5 px-2.5 text-xs text-muted-foreground">
+                <span className="absolute left-2.5 top-0">1</span>
+                <span
+                  className="absolute left-1/2 top-0 -translate-x-1/2 font-medium"
+                  style={{ color: energyAccent }}
+                >
+                  {energy}
+                </span>
+                <span className="absolute right-2.5 top-0">10</span>
               </div>
 
               <p className="text-sm mb-8" style={{ 
