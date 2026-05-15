@@ -27,6 +27,8 @@ interface DailyRitualProps {
 
 type Phase = 'energy' | 'desire' | 'loa' | 'complete';
 
+const ENERGY_THUMB_PX = 20;
+
 /** Map 1..10 so 5 is at 50% track (semantic middle centered), not linear (which centers ~5.5). */
 function energyToVisualPercent(energy: number): number {
   const e = Math.min(10, Math.max(1, energy));
@@ -62,8 +64,9 @@ export function DailyRitual({ userData, isOpen, onClose, onComplete }: DailyRitu
     const el = energyTrackRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    if (rect.width <= 0) return;
-    const ratio = (clientX - rect.left) / rect.width;
+    const usable = rect.width - ENERGY_THUMB_PX;
+    if (usable <= 0) return;
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left - ENERGY_THUMB_PX / 2) / usable));
     setEnergy(visualPercentToEnergy(ratio * 100));
   }, []);
 
@@ -94,6 +97,7 @@ export function DailyRitual({ userData, isOpen, onClose, onComplete }: DailyRitu
   }, []);
 
   const energyVisualPct = energyToVisualPercent(energy);
+  const energyU = energyVisualPct / 100;
   const energyAccent =
     energy <= 3 ? '#ef4444' : energy <= 6 ? '#f59e0b' : '#10b981';
 
@@ -239,18 +243,20 @@ Give them a brief, warm response (2-3 sentences). Meet them where they are. If e
                     }
                   }}
                 >
-                  <div className="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-white/10">
+                  <div className="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-white/10">
                     <div
-                      className="h-full rounded-full transition-[width] duration-75 ease-out"
+                      className="h-full rounded-l-full transition-[width] duration-75 ease-out"
                       style={{
-                        width: `${energyVisualPct}%`,
+                        width: `calc(${ENERGY_THUMB_PX / 2}px + (100% - ${ENERGY_THUMB_PX}px) * ${energyU})`,
                         backgroundColor: energyAccent,
                       }}
                     />
                   </div>
                   <div
                     className="pointer-events-none absolute top-1/2 z-10 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md ring-2 ring-primary/30"
-                    style={{ left: `${energyVisualPct}%` }}
+                    style={{
+                      left: `calc(${ENERGY_THUMB_PX / 2}px + (100% - ${ENERGY_THUMB_PX}px) * ${energyU})`,
+                    }}
                   />
                 </div>
               </div>

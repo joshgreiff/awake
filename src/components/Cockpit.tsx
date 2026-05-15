@@ -1071,9 +1071,36 @@ interface Task {
   createdAt: string;
 }
 
+function readTodaysRitualDesire(): string | null {
+  try {
+    const history = JSON.parse(localStorage.getItem('awake_ritual_history') || '[]') as {
+      date?: string;
+      desire?: string;
+    }[];
+    const today = new Date().toDateString();
+    for (const r of history) {
+      if (!r?.date) continue;
+      if (new Date(r.date).toDateString() !== today) continue;
+      const d = String(r.desire ?? '').trim();
+      if (d) return d;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 function TodayWidget() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState('');
+  const [ritualDesire, setRitualDesire] = useState<string | null>(() => readTodaysRitualDesire());
+
+  useEffect(() => {
+    const bump = () => setRitualDesire(readTodaysRitualDesire());
+    bump();
+    window.addEventListener(COCKPIT_SYNC_EVENT, bump);
+    return () => window.removeEventListener(COCKPIT_SYNC_EVENT, bump);
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('awake_today_tasks');
@@ -1138,6 +1165,13 @@ function TodayWidget() {
           </span>
         )}
       </div>
+
+      {ritualDesire ? (
+        <p className="mb-2 line-clamp-2 shrink-0 text-[10px] leading-snug text-muted-foreground">
+          <span className="opacity-50">From your ritual · </span>
+          <span className="italic">&ldquo;{ritualDesire}&rdquo;</span>
+        </p>
+      ) : null}
 
       <div className="mb-2 min-h-0 flex-1 space-y-1.5 overflow-y-auto">
         {sortedTasks.length === 0 ? (
