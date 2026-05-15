@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight, ArrowLeft, Sparkles, Check } from 'lucide-react';
+import { ArrowRight, Sparkles, Check } from 'lucide-react';
 import { Button } from './ui/button';
 import { LoaCompanion } from './LoaCompanion';
 import { 

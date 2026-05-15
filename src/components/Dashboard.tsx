@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { 
   Lightbulb, Brain, User, Heart, Zap, Target,
   Sparkles, TrendingUp, MessageCircle,
-  Settings, LogOut, Plus, Minus, Compass, BookOpen, Flame, ListChecks
+  Settings, LogOut, Plus, Minus, Compass, ListChecks
 } from 'lucide-react';
 import { AwakeLogo } from './AwakeLogo';
 import { LoaCompanion } from './LoaCompanion';
@@ -19,12 +19,9 @@ import { AwakeSession } from './AwakeSession';
 import type { UserData } from './OnboardingFlow';
 import { 
   type Archetype,
-  COGNITIVE_ORIENTATIONS,
-  MOTIVATIONAL_DRIVERS,
-  DEVELOPMENTAL_STATES,
   getArchetypeName 
 } from '../types/archetype';
-import { DOMAINS, type DomainId, type DomainState, calculateOverallAlignment } from '../types/domains';
+import { type DomainId, type DomainState, calculateOverallAlignment } from '../types/domains';
 import { notifyCockpitLocalChanged } from '../utils/cockpitCloudSync';
 
 interface DashboardProps {
@@ -57,7 +54,7 @@ export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProp
   const resistances = userData.preferences?.resistances || [];
   const evolutionFocuses = userData.growth?.changes || [];
   const archetype = userData.archetype as Archetype | undefined;
-  const domains = userData.domains as Record<DomainId, DomainState> | undefined;
+  const domains = userData.domains;
   
   // Safe calculation with fallback
   let overallAlignment: number | null = null;
@@ -89,23 +86,6 @@ export function Dashboard({ userData, onReset, onUpdateUserData }: DashboardProp
     localStorage.setItem('awake_reflections', JSON.stringify(updated));
     notifyCockpitLocalChanged();
   };
-
-  // Get reflection streak
-  const getReflectionStreak = (): number => {
-    try {
-      const streakData = localStorage.getItem('awake_reflection_streak');
-      if (!streakData) return 0;
-      const { count, lastDate } = JSON.parse(streakData);
-      const today = new Date().toDateString();
-      const yesterday = new Date(Date.now() - 86400000).toDateString();
-      if (lastDate === today || lastDate === yesterday) return count;
-      return 0;
-    } catch {
-      return 0;
-    }
-  };
-
-  const reflectionStreak = getReflectionStreak();
 
   // Get playbook progress
   const getPlaybookProgress = () => {

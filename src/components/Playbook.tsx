@@ -11,7 +11,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Plus, Target, Zap, Check, Trash2, 
-  ChevronRight, Flame, Calendar
+  ChevronRight, Flame
 } from 'lucide-react';
 import { Button } from './ui/button';
 import type { UserData } from './OnboardingFlow';
@@ -55,7 +55,7 @@ const SUGGESTED_LEVERS = [
 
 const STORAGE_KEY = 'awake_playbook';
 
-export function Playbook({ userData, isOpen, onClose, onSave }: PlaybookProps) {
+export function Playbook({ userData: _userData, isOpen, onClose, onSave }: PlaybookProps) {
   const [playbook, setPlaybook] = useState<PlaybookData>({
     currentProject: null,
     dailyLevers: [],

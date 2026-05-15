@@ -4,8 +4,10 @@ import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { Pen } from 'lucide-react';
 
+import type { UserData } from '../OnboardingFlow';
+
 interface PromiseToSelfProps {
-  userData: Record<string, unknown>;
+  userData: UserData;
   onContinue: (intention: string) => void;
 }
 

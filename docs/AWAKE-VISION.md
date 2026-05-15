@@ -135,4 +135,98 @@ Enough governed selves shift civilization. Awake is not trying to restore people
 
 ---
 
+## Founder notes (living)
+
+*Scratchpad for tension, bets, and honest gaps — update as clarity shifts.*
+
+### Dogfood vs. framework
+
+Awake sits in an interesting spot: it is something the founder **needs in their own life**, and simultaneously a **framework they are sharing** for building a beautiful life first — not performance for an audience. The product should respect both: real utility for the builder, and legibility for others walking a similar path.
+
+### Foundation, freedom, then right-order problems
+
+The through-line is **foundation and freedom first**, then tackling problems in an order **you choose**: what is **actually nagging**, not what is expected of you or what reads well on a resume. That is a governance stance (sovereignty over the backlog of life), not a hustle stance.
+
+### The honest gap: execution and executive function
+
+There is a sense of already having **first foundation** and **awakeness** (orientation, values, seeing clearly) while **missing the execution layer** and struggling with **executive function** — initiating, sequencing, sustaining, context-switching, closing loops. If Awake is “personal governance,” this gap suggests Layer 4 (Management Engine) and day-to-day UX must eventually answer: *how does the system help someone who already “gets it” actually do the next right thing, on the right day, without shame or sprawl?*
+
+### Answers so far (informal)
+
+Captured from founder reflection — incomplete is fine; gaps are product signal.
+
+**What “foundation is solid” means (for this founder)**  
+Not a checklist of outputs — a **mindset and integrity of motion**: not doing things “just to do them.” Trusting intuition when something is draining life (e.g. leaving a job that was bad for the whole life, dropping out of college). **Living in accord with a natural inner compass** rather than external scripts alone.
+
+**Where execution breaks**  
+**Choosing** among many ideas without acting on most of them. **Containers that lock choice** helped: e.g. a **100-day upload challenge** — less about the content than **proof to self that sticking is possible when something is chosen on purpose**. The key is **choice + follow-through**, not the metric for its own sake. Open needs Awake could eventually serve: **what actually moves the needle**, and **how to track progress** in a way that matches that (not generic streaks).
+
+**Inner narrative: “never doing enough”**  
+A recurring feeling that output is always short of some bar — even when capacity to commit has already been demonstrated. Product implication: Awake should resist **amplifying scarcity of effort** (more tasks, harsher bars) and instead help **name enough**, **protect chosen scope**, and **witness follow-through** without turning life into a permanent deficit report.
+
+**Low executive-function days — dignified help**  
+Present **options in a kind voice**, without implying one path is “better.” Neutrality preserves agency; ranking can feel like pressure or judgment.
+
+**Still unknown / in motion**  
+- How Awake should **label or sort** “what is nagging at me” vs obligation/resume theater — **no answer yet**; the product can explore this *with* users rather than pretending it is solved on day one.  
+- **Weekly ritual** — something the founder still needs to establish for themselves; Awake might later *host* a ritual without prescribing the “right” one.
+
+**On needing help while building**  
+Not having answers to every discovery question — and still needing support — does **not** disqualify the build. It is the same bridge Awake describes: **integration without pretending execution is already mastered.** First-user honesty keeps the product from becoming performative wellness.
+
+### What “who is Awake *not* for?” means (strategy, not judgment)
+
+In product work, “who is it **for**?” is often paired with “who is it **not** for — on purpose?” That is **not** about worth or who “deserves” Awake. It is a **focus** tool: if the product tries to please everyone (e.g. pure habit streaks, corporate OKRs, casual dopamine, people who want zero reflection), the core gets diluted. Naming a **non-audience** (even roughly) keeps messaging, onboarding, and features aligned with the **integration / governance** thesis — and saves you from building a second generic productivity app by accident. The answer can be “TBD”; the *question* is what sharpens the wedge.
+
+### When Loa goes deep vs. commits (working hypothesis)
+
+*Until user research sharpens this, treat as a default stance for UX and prompts.*
+
+| Go **deep** (extract / mirror / why) | Stay **shallow** or **commit** (one step, time box, options) |
+|--------------------------------------|---------------------------------------------------------------|
+| User signals values conflict, grief, identity transition, or “why am I doing any of this?” | User is in **delivery mode**, deadline pressure, or asks for concrete next actions |
+| After major life moves (job, relationship, geography) — sense-making | **Low bandwidth / low EF day** — offer kind option lists, no forced ranking |
+| Archetype/domain drift shows up in structured data | User already named **one** focus for the week — Loa protects that thread |
+| User explicitly invites depth (“I need to talk this through”) | User asks “what should I do today?” — prefer **small** commitments over philosophy |
+
+Depth should **never** be the only move: end deep sessions by optionally **anchoring** one tiny next step or a follow-up time, so insight does not evaporate.
+
+---
+
+## Questions that bring the vision to life
+
+Use these in solo reflection or with a cofounder; answers can feed roadmap and copy. **Skip any that feel blank** — returning later is normal.
+
+### A. Who it is really for (first wedge)
+
+1. If Awake could only help **one** person archetype for the next 12 months, who is it — and what is the **one** outcome they would pay for (money or attention)?
+2. Who is **excluded** on purpose (not “everyone with good taste”)?
+3. When someone says “it clicked,” what **changed in their week** — not their beliefs?
+
+### B. Foundation vs. execution (your current edge)
+
+4. What does “foundation is solid” **look like in observable behavior** for you (3–5 signals), vs. “I’m spinning”?
+5. What breaks execution most often: **starting**, **choosing**, **sustaining**, **finishing**, or **recovering after drop-off**?
+6. What help would feel **dignified** on a bad EF day — gentle, structural, or silent — vs. what would feel like **nagging or surveillance**?
+
+### C. Nagging vs. expected (product grammar)
+
+7. How should Awake **represent** “this is nagging at me” vs. “this is obligation/resume theater” in the UI or in Loa’s prompts?
+8. Should the system **ever** hold space for obligations you cannot drop yet — and if yes, how does it **not** colonize the whole dashboard?
+9. What is the **minimum weekly ritual** that keeps “chosen order” from dissolving into drift?
+
+### D. Loa’s role at the execution boundary
+
+10. When should Loa **extract** (why, values, identity) vs. **commit** (one next step, time box, definition of done)?
+11. What would make you trust Loa to **name one priority** without feeling bulldozed?
+12. What structured outputs (anchors, domains, “today”) must stay **stable** so chat does not become another infinite scroll?
+
+### E. Proof and scope
+
+13. What would a **90-day** “this worked” story sound like for Awake’s **first** paying or deeply committed user?
+14. What are you **willing not to build** until post–product-market fit (habits, social, mobile, etc.)?
+15. If Awake disappeared tomorrow, what **single habit or artifact** would you still keep — and should that be **exportable**?
+
+---
+
 *This document is the north star for all Awake development.*

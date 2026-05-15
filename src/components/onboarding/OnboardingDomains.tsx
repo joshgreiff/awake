@@ -40,6 +40,21 @@ const STATE_LABELS = [
   { value: 5, label: 'Thriving' },
 ];
 
+function snapshotDomainState(domainId: DomainId, baseline: number): DomainState {
+  const meta = DOMAINS[domainId];
+  return {
+    id: domainId,
+    name: meta.name,
+    description: meta.description,
+    currentBaseline: baseline,
+    desiredState: STATE_LABELS[4].label,
+    alignmentScore: Math.min(100, baseline * 20),
+    frictionPoints: [],
+    suggestedChanges: [],
+    lastReflection: new Date(),
+  };
+}
+
 export function OnboardingDomains({ userName, onContinue }: OnboardingDomainsProps) {
   const [phase, setPhase] = useState<'intro' | 'assessment' | 'summary'>('intro');
   const [currentDomainIndex, setCurrentDomainIndex] = useState(0);
@@ -55,13 +70,7 @@ export function OnboardingDomains({ userName, onContinue }: OnboardingDomainsPro
   const handleNextDomain = () => {
     setDomainStates(prev => ({
       ...prev,
-      [currentDomainId]: {
-        currentBaseline,
-        desiredState: 5,
-        alignmentScore: currentBaseline * 20,
-        frictionPoints: [],
-        suggestedChanges: [],
-      }
+      [currentDomainId]: snapshotDomainState(currentDomainId, currentBaseline),
     }));
 
     if (currentDomainIndex < domainIds.length - 1) {
@@ -74,13 +83,7 @@ export function OnboardingDomains({ userName, onContinue }: OnboardingDomainsPro
 
   const handleComplete = () => {
     const finalStates = { ...domainStates };
-    finalStates[currentDomainId] = {
-      currentBaseline,
-      desiredState: 5,
-      alignmentScore: currentBaseline * 20,
-      frictionPoints: [],
-      suggestedChanges: [],
-    };
+    finalStates[currentDomainId] = snapshotDomainState(currentDomainId, currentBaseline);
     onContinue(finalStates as Record<DomainId, DomainState>);
   };
 

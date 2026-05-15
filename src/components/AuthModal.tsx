@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Mail, Loader2, Chrome, User, ArrowRight } from 'lucide-react';
+import { Mail, Loader2, Chrome, User, ArrowRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';

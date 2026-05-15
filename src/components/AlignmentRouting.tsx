@@ -43,8 +43,6 @@ export function AlignmentRouting({ userData, session, isOpen, onClose, onComplet
   const [suggestedAction, setSuggestedAction] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const userName = userData.identity?.name || 'Traveler';
-
   // Load paths on open
   useEffect(() => {
     if (isOpen) {

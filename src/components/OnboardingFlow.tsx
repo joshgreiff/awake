@@ -7,6 +7,8 @@ import { OnboardingDomains } from './onboarding/OnboardingDomains';
 import { PromiseToSelf } from './onboarding/PromiseToSelf';
 import { DashboardUnlock } from './onboarding/DashboardUnlock';
 import type { CockpitSyncState } from '../types/cockpitSync';
+import type { Archetype } from '../types/archetype';
+import type { DomainId, DomainState } from '../types/domains';
 
 interface OnboardingFlowProps {
   onComplete: (userData: UserData) => void;
@@ -19,6 +21,8 @@ export interface UserData {
     pronouns: string;
     alias?: string;
   };
+  /** Optional profile image URL (e.g. avatar picker export) */
+  avatar?: string;
   stats?: Record<string, number>;
   preferences?: {
     attractions: string[];
@@ -41,18 +45,8 @@ export interface UserData {
   antiVision?: string;
   /** Synced cockpit + habits when signed in (see utils/cockpitCloudSync) */
   cockpitSync?: CockpitSyncState;
-  archetype?: {
-    cognitiveOrientation: string;
-    primaryDriver: string;
-    developmentalState: string;
-  };
-  domains?: Record<string, {
-    currentBaseline: number;
-    desiredState: number;
-    alignmentScore: number;
-    frictionPoints: string[];
-    suggestedChanges: string[];
-  }>;
+  archetype?: Archetype;
+  domains?: Partial<Record<DomainId, DomainState>>;
 }
 
 type Stage = 

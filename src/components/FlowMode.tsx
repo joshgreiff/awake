@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Sparkles, ArrowRight, X, Zap } from 'lucide-react';
+import { Sparkles, X, Zap } from 'lucide-react';
 import { Button } from './ui/button';
 import { LoaCompanion } from './LoaCompanion';
 import type { UserData } from './OnboardingFlow';

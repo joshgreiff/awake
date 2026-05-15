@@ -11,7 +11,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Zap, Sparkles, ArrowRight, X, Sun, Heart } from 'lucide-react';
+import { Sparkles, ArrowRight, X, Sun, Heart } from 'lucide-react';
 import { Button } from './ui/button';
 import { LoaCompanion } from './LoaCompanion';
 import type { UserData } from './OnboardingFlow';
@@ -42,6 +42,9 @@ export function DailyRitual({ userData, isOpen, onClose, onComplete }: DailyRitu
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
   };
+
+  /** Match native range thumb position: (value - min) / (max - min), not value/10. */
+  const energyFillPercent = ((energy - 1) / 9) * 100;
 
   const getEnergyLabel = (value: number) => {
     if (value <= 2) return 'Running low';
@@ -166,8 +169,8 @@ Give them a brief, warm response (2-3 sentences). Meet them where they are. If e
                   style={{
                     background: `linear-gradient(to right, 
                       ${energy <= 3 ? '#ef4444' : energy <= 6 ? '#f59e0b' : '#10b981'} 0%, 
-                      ${energy <= 3 ? '#ef4444' : energy <= 6 ? '#f59e0b' : '#10b981'} ${energy * 10}%, 
-                      rgba(255,255,255,0.1) ${energy * 10}%, 
+                      ${energy <= 3 ? '#ef4444' : energy <= 6 ? '#f59e0b' : '#10b981'} ${energyFillPercent}%, 
+                      rgba(255,255,255,0.1) ${energyFillPercent}%, 
                       rgba(255,255,255,0.1) 100%)`,
                   }}
                 />

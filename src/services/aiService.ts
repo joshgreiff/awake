@@ -233,8 +233,10 @@ class AIService {
     return this.config;
   }
 
-  getProvider() {
-    return PROVIDERS[this.config.provider] || PROVIDERS.awake;
+  getProvider(): (typeof PROVIDERS)[ProviderId] {
+    const id = this.config.provider;
+    const key = id in PROVIDERS ? id : 'awake';
+    return PROVIDERS[key as ProviderId];
   }
 
   isConfigured(): boolean {
@@ -280,7 +282,7 @@ class AIService {
       case 'ollama':
         return this.chatOllama(messages, options);
       default:
-        throw new Error(`Unknown provider: ${provider.id}`);
+        throw new Error('Unknown AI provider');
     }
   }
 
@@ -412,7 +414,7 @@ class AIService {
   }
 
   // Ollama API (local)
-  private async chatOllama(messages: Message[], options: ChatOptions): Promise<string> {
+  private async chatOllama(messages: Message[], _options: ChatOptions): Promise<string> {
     const endpoint = this.config.customEndpoint || 'http://localhost:11434/api/chat';
     
     const response = await fetch(endpoint, {

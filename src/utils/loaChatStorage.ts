@@ -72,7 +72,8 @@ function normalizeState(raw: LoaChatsState): LoaChatsState {
     createdAt: typeof c.createdAt === 'string' ? c.createdAt : new Date().toISOString(),
     updatedAt: typeof c.updatedAt === 'string' ? c.updatedAt : new Date().toISOString(),
     messages: Array.isArray(c.messages)
-      ? c.messages.map((m: any, i: number) => ({
+      ? c.messages.map(
+          (m: any, i: number): LoaChatMessageRecord => ({
           id: String(m?.id ?? `m-${i}`),
           role: m?.role === 'user' ? 'user' : 'assistant',
           content: String(m?.content ?? ''),
@@ -80,7 +81,8 @@ function normalizeState(raw: LoaChatsState): LoaChatsState {
             typeof m?.timestamp === 'string'
               ? m.timestamp
               : new Date().toISOString(),
-        }))
+        }),
+        )
       : [],
   }));
   let activeId = raw.activeId && conversations.some((c) => c.id === raw.activeId) ? raw.activeId : null;

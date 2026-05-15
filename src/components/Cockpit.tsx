@@ -34,7 +34,7 @@ import { DomainMapping } from './DomainMapping';
 import { DailyRitual } from './DailyRitual';
 import { Button } from './ui/button';
 import type { UserData } from './OnboardingFlow';
-import { getArchetypeName } from '../types/archetype';
+import { getArchetypeName, type Archetype } from '../types/archetype';
 import { DOMAINS, type DomainId, calculateOverallAlignment } from '../types/domains';
 
 interface CockpitProps {
@@ -115,7 +115,6 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
   const [isDomainsOpen, setIsDomainsOpen] = useState(false);
   const [isRitualOpen, setIsRitualOpen] = useState(false);
   const [todayRitual, setTodayRitual] = useState<{ energy: number; desire: string; loaMessage: string } | null>(null);
-  const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [binItems, setBinItems] = useState<string[]>([]);
   const [newBinItem, setNewBinItem] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -123,7 +122,7 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
   const [profilePronouns, setProfilePronouns] = useState('');
 
   const userName = userData.identity?.name || 'Traveler';
-  const archetype = userData.archetype;
+  const archetype = userData.archetype as Archetype | undefined;
   const archetypeName = archetype ? getArchetypeName(archetype) : null;
 
   /** Stable per mount — do not call Math.random() in render (causes layout jump on every re-render). */
@@ -850,19 +849,20 @@ function WidgetCard({
         );
       }
 
-      case 'traits':
-        const archetype = userData.archetype;
+      case 'traits': {
+        const traitsArchetype = userData.archetype as Archetype | undefined;
         return (
           <div className="flex h-full min-h-0 flex-col overflow-hidden">
             <Brain className="mb-2 h-5 w-5 shrink-0 text-indigo-400" />
             <p className="mb-1 shrink-0 text-xs opacity-50">Archetype</p>
-            {archetype ? (
-              <p className="line-clamp-3 text-sm leading-snug">{getArchetypeName(archetype)}</p>
+            {traitsArchetype ? (
+              <p className="line-clamp-3 text-sm leading-snug">{getArchetypeName(traitsArchetype)}</p>
             ) : (
               <p className="text-xs opacity-30">Discover yours</p>
             )}
           </div>
         );
+      }
 
       case 'paths':
         return (
@@ -1369,7 +1369,6 @@ function PlaybookWidget() {
 function LoaTodayWidget({ userData }: { userData: UserData }) {
   const [advice, setAdvice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [lastAsked, setLastAsked] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('awake_loa_today');
@@ -1378,7 +1377,6 @@ function LoaTodayWidget({ userData }: { userData: UserData }) {
       const today = new Date().toDateString();
       if (parsed.date === today) {
         setAdvice(parsed.advice);
-        setLastAsked(parsed.date);
       }
     }
   }, []);
@@ -1412,7 +1410,6 @@ Give me ONE clear priority for today. Be specific and direct. 2-3 sentences max.
       setAdvice(response);
       
       const today = new Date().toDateString();
-      setLastAsked(today);
       localStorage.setItem('awake_loa_today', JSON.stringify({ date: today, advice: response }));
       notifyCockpitLocalChanged();
     } catch (err) {

@@ -15,6 +15,29 @@ import { Button } from './ui/button';
 import { LoaCompanion } from './LoaCompanion';
 import { DOMAINS, type DomainId, type DomainState } from '../types/domains';
 
+function buildDomainState(
+  domainId: DomainId,
+  currentBaseline: number,
+  desiredLevel: number,
+  frictionPoints: string[],
+): DomainState {
+  const meta = DOMAINS[domainId];
+  const desiredLabel = STATE_LABELS.find((s) => s.value === desiredLevel)?.label ?? String(desiredLevel);
+  const alignmentScore =
+    desiredLevel <= 0 ? 0 : Math.min(100, Math.round((currentBaseline / desiredLevel) * 100));
+  return {
+    id: domainId,
+    name: meta.name,
+    description: meta.description,
+    currentBaseline,
+    desiredState: desiredLabel,
+    alignmentScore,
+    frictionPoints,
+    suggestedChanges: [],
+    lastReflection: new Date(),
+  };
+}
+
 interface DomainMappingProps {
   onComplete: (domains: Record<DomainId, DomainState>) => void;
   onClose?: () => void;
@@ -66,13 +89,12 @@ export function DomainMapping({ onComplete, onClose }: DomainMappingProps) {
     // Save current domain state
     setDomainStates(prev => ({
       ...prev,
-      [currentDomainId]: {
+      [currentDomainId]: buildDomainState(
+        currentDomainId,
         currentBaseline,
         desiredState,
-        alignmentScore: Math.round((currentBaseline / desiredState) * 100),
-        frictionPoints: frictionPoint ? [frictionPoint] : [],
-        suggestedChanges: [],
-      }
+        frictionPoint ? [frictionPoint] : [],
+      ),
     }));
 
     if (currentDomainIndex < domainIds.length - 1) {
@@ -91,13 +113,12 @@ export function DomainMapping({ onComplete, onClose }: DomainMappingProps) {
     const finalStates = { ...domainStates };
     
     // Ensure current domain is saved
-    finalStates[currentDomainId] = {
+    finalStates[currentDomainId] = buildDomainState(
+      currentDomainId,
       currentBaseline,
       desiredState,
-      alignmentScore: Math.round((currentBaseline / desiredState) * 100),
-      frictionPoints: frictionPoint ? [frictionPoint] : [],
-      suggestedChanges: [],
-    };
+      frictionPoint ? [frictionPoint] : [],
+    );
 
     onComplete(finalStates as Record<DomainId, DomainState>);
   };
@@ -229,7 +250,7 @@ export function DomainMapping({ onComplete, onClose }: DomainMappingProps) {
                     {currentDomain.description}
                   </p>
                   <p className="text-xs opacity-50 mt-2 italic">
-                    "{currentDomain.keyQuestion}"
+                    "{currentDomain.keyQuestions[0] ?? ''}"
                   </p>
                 </div>
 
