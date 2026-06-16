@@ -16,7 +16,11 @@ export interface OnboardingProgress {
 }
 
 export function isOnboardingComplete(data: UserData | null | undefined): boolean {
-  return !!data?.identity?.name;
+  if (!data) return false;
+  if (data.identity?.name?.trim()) return true;
+  const loose = data as Record<string, unknown>;
+  if (typeof loose.name === 'string' && loose.name.trim()) return true;
+  return false;
 }
 
 export function readOnboardingProgress(): OnboardingProgress | null {

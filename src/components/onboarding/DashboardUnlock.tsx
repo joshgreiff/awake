@@ -13,9 +13,11 @@ interface UserData {
 interface DashboardUnlockProps {
   userData: UserData;
   onEnter: () => void;
+  isSaving?: boolean;
+  saveError?: string | null;
 }
 
-export function DashboardUnlock({ userData, onEnter }: DashboardUnlockProps) {
+export function DashboardUnlock({ userData, onEnter, isSaving, saveError }: DashboardUnlockProps) {
   return (
     <div className="relative w-full h-full overflow-hidden flex items-center justify-center">
       {/* Planet visualization background — must not intercept clicks */}
@@ -202,27 +204,38 @@ export function DashboardUnlock({ userData, onEnter }: DashboardUnlockProps) {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 2.5, duration: 0.8 }}
+          className="relative z-20"
         >
+          {saveError && (
+            <p className="mb-3 max-w-sm mx-auto text-center text-sm text-red-300/90">
+              Could not save to your account: {saveError}
+            </p>
+          )}
           <Button
             type="button"
             onClick={onEnter}
-            className="relative z-20 px-12 py-7 rounded-full text-lg cursor-pointer text-white font-medium pointer-events-auto"
+            disabled={isSaving}
+            className="relative z-20 px-12 py-7 rounded-full text-lg cursor-pointer text-white font-medium pointer-events-auto disabled:opacity-60"
             style={{
               background: "linear-gradient(135deg, #6366f1, #14b8a6, #f59e0b)",
               boxShadow: "0 0 60px rgba(99, 102, 241, 0.6)"
             }}
           >
             <motion.span
-              animate={{
-                textShadow: [
-                  '0 0 10px rgba(255, 255, 255, 0.5)',
-                  '0 0 20px rgba(255, 255, 255, 0.8)',
-                  '0 0 10px rgba(255, 255, 255, 0.5)'
-                ]
-              }}
+              animate={
+                isSaving
+                  ? undefined
+                  : {
+                      textShadow: [
+                        '0 0 10px rgba(255, 255, 255, 0.5)',
+                        '0 0 20px rgba(255, 255, 255, 0.8)',
+                        '0 0 10px rgba(255, 255, 255, 0.5)',
+                      ],
+                    }
+              }
               transition={{ duration: 2, repeat: Infinity }}
             >
-              Enter The Grid
+              {isSaving ? 'Saving your profile…' : 'Enter The Grid'}
             </motion.span>
           </Button>
         </motion.div>

@@ -15,6 +15,7 @@ const KEYS = {
   sessions: 'awake_sessions',
   reflectionStreak: 'awake_reflection_streak',
   chatHistory: 'awake_chat_history',
+  artifacts: 'awake_artifacts',
 } as const;
 
 function safeParse<T>(raw: string | null, fallback: T): T {
@@ -52,6 +53,7 @@ export function buildCockpitSyncSnapshot(): CockpitSyncState {
   const chatRaw = localStorage.getItem(KEYS.chatHistory);
   const chatParsed = parseLoaChatsStorage(chatRaw);
   const chatHistory = trimLoaChatsForCloud(chatParsed) as unknown;
+  const artifacts = safeParse<unknown[]>(localStorage.getItem(KEYS.artifacts), []).slice(0, 100);
 
   return {
     ritualHistory,
@@ -65,6 +67,7 @@ export function buildCockpitSyncSnapshot(): CockpitSyncState {
     sessions,
     reflectionStreak,
     chatHistory,
+    artifacts,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -116,5 +119,8 @@ export function applyCockpitSyncToLocalStorage(data: Partial<CockpitSyncState> |
     ) {
       localStorage.setItem(KEYS.chatHistory, JSON.stringify(data.chatHistory));
     }
+  }
+  if (data.artifacts !== undefined && Array.isArray(data.artifacts)) {
+    localStorage.setItem(KEYS.artifacts, JSON.stringify(data.artifacts));
   }
 }

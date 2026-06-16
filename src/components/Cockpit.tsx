@@ -1,27 +1,38 @@
 /**
- * Consciousness Cockpit
- * 
- * The control panel for your inner operating system.
- * 
- * Philosophy:
- * - Using the interface IS the transformation
- * - Sliders don't just display - moving them is the work
- * - Your avatar/identity at the center
- * - Widgets you arrange YOUR way
- * - Visual actions = real actions
+ * Daily Cockpit — bounded session for becoming.
+ *
+ * One loop: check in → show up → move → (optional) talk to Loa.
+ * Widgets are tools inside the container, not the product.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Zap, Brain, Eye, Heart, Flame, Target,
-  MessageCircle, Settings, Trash2, Plus,
-  Sparkles, Sun, Moon, Star, Hexagon,
-  Calendar, CheckCircle2, Circle, Rocket, HelpCircle, LogOut, UserRound, X
+  Zap, Eye, Heart, Flame, Target,
+  Settings, Trash2, Plus,
+  Sun, Moon, Star, Hexagon,
+  Calendar, CheckCircle2, Circle, Rocket, LogOut, UserRound, X,
+  GripVertical, Trophy, ChevronDown, Gem
 } from 'lucide-react';
-import aiService from '../services/aiService';
 import { triggerSmallCelebration } from '../utils/confetti';
+import {
+  addArtifact,
+  hasArtifactToday,
+  readArtifacts,
+  tierColor,
+  type Artifact,
+  type ArtifactTier,
+} from '../utils/artifacts';
 import { computeAwakeDayStreak, collectActiveDays } from '../utils/streak';
+import {
+  clearDailyChallenge,
+  computeChallengeStreak,
+  hasShownUpToday,
+  logShowUpToday,
+  readDailyChallengeState,
+  setDailyChallenge,
+  unlogShowUpToday,
+} from '../utils/dailyChallenge';
 import {
   buildCockpitSyncSnapshot,
   COCKPIT_SYNC_EVENT,
@@ -52,10 +63,83 @@ interface StateSlider {
   description: string;
 }
 
+type WidgetType =
+  | 'vision'
+  | 'intention'
+  | 'streak'
+  | 'bin'
+  | 'domains'
+  | 'today'
+  | 'playbook'
+  | 'daily-challenge'
+  | 'artifacts';
+
 interface Widget {
   id: string;
-  type: 'vision' | 'intention' | 'streak' | 'loa' | 'traits' | 'paths' | 'bin' | 'domains' | 'today' | 'playbook' | 'loa-today' | 'empty';
+  type: WidgetType;
   position: number;
+}
+
+const DEPRECATED_WIDGET_TYPES = new Set([
+  'loa', 'loa-today', 'paths', 'traits', 'empty',
+]);
+
+const DEFAULT_WIDGETS: Widget[] = [
+  { id: 'w-challenge', type: 'daily-challenge', position: 0 },
+  { id: 'w-today', type: 'today', position: 1 },
+  { id: 'w-streak', type: 'streak', position: 2 },
+];
+
+const WIDGET_TYPES: { type: WidgetType; name: string; icon: React.ElementType }[] = [
+  { type: 'daily-challenge', name: 'Daily Challenge', icon: Trophy },
+  { type: 'artifacts', name: 'Artifact Vault', icon: Gem },
+  { type: 'today', name: 'Today', icon: Calendar },
+  { type: 'playbook', name: 'Boss Fight', icon: Rocket },
+  { type: 'streak', name: 'Streak', icon: Zap },
+  { type: 'intention', name: 'Intention', icon: Flame },
+  { type: 'vision', name: 'Vision', icon: Star },
+  { type: 'domains', name: 'Life Domains', icon: Hexagon },
+  { type: 'bin', name: 'Release', icon: Trash2 },
+];
+
+const ALLOWED_WIDGET_TYPES = new Set(WIDGET_TYPES.map((w) => w.type));
+
+function sanitizeWidgets(raw: unknown): Widget[] {
+  if (!Array.isArray(raw)) return DEFAULT_WIDGETS;
+
+  const filtered = raw
+    .filter(
+      (w): w is Widget =>
+        typeof w === 'object' &&
+        w !== null &&
+        typeof (w as Widget).id === 'string' &&
+        typeof (w as Widget).type === 'string' &&
+        !DEPRECATED_WIDGET_TYPES.has((w as Widget).type) &&
+        ALLOWED_WIDGET_TYPES.has((w as Widget).type as WidgetType)
+    )
+    .map((w, i) => ({ ...w, position: i }));
+
+  return filtered.length > 0 ? filtered : DEFAULT_WIDGETS;
+}
+
+function hasMovedToday(): boolean {
+  if (hasArtifactToday()) return true;
+  try {
+    const today = new Date().toDateString();
+    const tasks = JSON.parse(localStorage.getItem('awake_today_tasks') || '[]') as {
+      done?: boolean;
+      createdAt?: string;
+    }[];
+    if (tasks.some((t) => t.done && new Date(t.createdAt || '').toDateString() === today)) {
+      return true;
+    }
+    const playbook = JSON.parse(localStorage.getItem('awake_playbook') || 'null') as {
+      levers?: { done?: boolean }[];
+    } | null;
+    return playbook?.levers?.some((l) => l.done) ?? false;
+  } catch {
+    return false;
+  }
 }
 
 const DEFAULT_SLIDERS: StateSlider[] = [
@@ -64,20 +148,6 @@ const DEFAULT_SLIDERS: StateSlider[] = [
   { id: 'presence', name: 'Presence', icon: Eye, value: 50, color: '#14b8a6', description: 'Here and now' },
   { id: 'openness', name: 'Openness', icon: Heart, value: 50, color: '#ec4899', description: 'Receptivity to change' },
 ];
-
-const WIDGET_TYPES = [
-  { type: 'today', name: 'Today', icon: Calendar },
-  { type: 'playbook', name: 'Playbook', icon: Rocket },
-  { type: 'loa-today', name: "Loa's Advice", icon: HelpCircle },
-  { type: 'vision', name: 'My Vision', icon: Star },
-  { type: 'intention', name: 'Core Intention', icon: Flame },
-  { type: 'streak', name: 'Streak', icon: Zap },
-  { type: 'loa', name: 'Quick Chat', icon: MessageCircle },
-  { type: 'traits', name: 'My Traits', icon: Brain },
-  { type: 'paths', name: 'Active Paths', icon: Target },
-  { type: 'domains', name: 'Life Domains', icon: Hexagon },
-  { type: 'bin', name: 'Release Bin', icon: Trash2 },
-] as const;
 
 export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps) {
   const [sliders, setSliders] = useState<StateSlider[]>(() => {
@@ -101,12 +171,7 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
   
   const [widgets, setWidgets] = useState<Widget[]>(() => {
     const saved = localStorage.getItem('awake_cockpit_widgets');
-    return saved ? JSON.parse(saved) : [
-      { id: 'w1', type: 'intention', position: 0 },
-      { id: 'w2', type: 'loa', position: 1 },
-      { id: 'w3', type: 'paths', position: 2 },
-      { id: 'w4', type: 'bin', position: 3 },
-    ];
+    return saved ? sanitizeWidgets(JSON.parse(saved)) : DEFAULT_WIDGETS;
   });
 
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -120,34 +185,14 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [profilePronouns, setProfilePronouns] = useState('');
+  const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
+  const [dragOverWidgetId, setDragOverWidgetId] = useState<string | null>(null);
+
+  const sortedWidgets = [...widgets].sort((a, b) => a.position - b.position);
 
   const userName = userData.identity?.name || 'Traveler';
   const archetype = userData.archetype as Archetype | undefined;
   const archetypeName = archetype ? getArchetypeName(archetype) : null;
-
-  /** Stable per mount — do not call Math.random() in render (causes layout jump on every re-render). */
-  const [loaGreetingLine] = useState(() => {
-    const hour = new Date().getHours();
-    const greetings =
-      hour < 12
-        ? [
-            `${userName}, you're already here. That's the first win.`,
-            `New day, clean slate. What wants to happen today?`,
-            `I'm glad you showed up. Let's make this count.`,
-          ]
-        : hour < 17
-          ? [
-              `Still here, still showing up. I see you.`,
-              `How's the day unfolding? I'm here if you need me.`,
-              `Checking in — you're doing better than you think.`,
-            ]
-          : [
-              `Winding down? Take a breath. You made it through.`,
-              `Evening check-in. What went well today?`,
-              `The day's almost done. Be gentle with yourself.`,
-            ];
-    return greetings[Math.floor(Math.random() * greetings.length)];
-  });
 
   useEffect(() => {
     if (isProfileOpen) {
@@ -220,7 +265,20 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
   };
 
   const handleRemoveWidget = (id: string) => {
-    setWidgets(widgets.filter(w => w.id !== id));
+    setWidgets(widgets.filter(w => w.id !== id).map((w, i) => ({ ...w, position: i })));
+  };
+
+  const handleReorderWidgets = (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    setWidgets((prev) => {
+      const items = [...prev].sort((a, b) => a.position - b.position);
+      const fromIdx = items.findIndex((w) => w.id === fromId);
+      const toIdx = items.findIndex((w) => w.id === toId);
+      if (fromIdx < 0 || toIdx < 0) return prev;
+      const [moved] = items.splice(fromIdx, 1);
+      items.splice(toIdx, 0, moved);
+      return items.map((w, i) => ({ ...w, position: i }));
+    });
   };
 
   const handleReleaseToBin = () => {
@@ -233,6 +291,39 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
     }, 2000);
   };
 
+  const [sessionTick, setSessionTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setSessionTick((n) => n + 1);
+    window.addEventListener(COCKPIT_SYNC_EVENT, bump);
+    return () => window.removeEventListener(COCKPIT_SYNC_EVENT, bump);
+  }, []);
+
+  const sessionSteps = useMemo(() => {
+    const hasChallenge = !!readDailyChallengeState().challenge;
+    return [
+      { id: 'checkin', label: 'Check in', done: !!todayRitual },
+      {
+        id: 'showup',
+        label: hasChallenge ? 'Show up' : 'Set challenge',
+        done: hasChallenge && hasShownUpToday(),
+      },
+      { id: 'move', label: 'Move', done: hasMovedToday() },
+    ];
+  }, [todayRitual, sessionTick]);
+
+  const sessionComplete = sessionSteps.every((s) => s.done);
+
+  const sessionCelebratedRef = useRef(false);
+  useEffect(() => {
+    if (!sessionComplete) {
+      sessionCelebratedRef.current = false;
+      return;
+    }
+    if (sessionCelebratedRef.current) return;
+    sessionCelebratedRef.current = true;
+    triggerSmallCelebration();
+  }, [sessionComplete]);
+
   const getTimeGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -244,232 +335,153 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
     <div className="min-h-screen p-4 md:p-6" style={{ 
       background: 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0a0a0f 100%)'
     }}>
-      {/* Header */}
-      <header className="flex items-center justify-between mb-4">
+      <header className="mx-auto mb-6 flex max-w-xl items-start justify-between">
         <div>
-          <p className="text-xs opacity-50 uppercase tracking-widest">Awake Console</p>
+          <p className="text-xs uppercase tracking-widest text-teal-400/70">Today&apos;s session</p>
           <h1 className="text-xl font-medium">{getTimeGreeting()}, {userName}</h1>
+          {archetypeName && (
+            <p className="mt-0.5 text-sm opacity-45">{archetypeName}</p>
+          )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button 
             onClick={() => setIsProfileOpen(true)}
-            className="p-2 rounded-lg hover:bg-white/5 transition-colors"
-            title="Profile & display name"
+            className="rounded-lg p-2 transition-colors hover:bg-white/5"
+            title="Profile"
           >
-            <UserRound className="w-5 h-5 opacity-50" />
+            <UserRound className="h-5 w-5 opacity-50" />
           </button>
           <button 
             onClick={() => setIsSettingsOpen(true)}
-            className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+            className="rounded-lg p-2 transition-colors hover:bg-white/5"
             title="Settings"
           >
-            <Settings className="w-5 h-5 opacity-50" />
+            <Settings className="h-5 w-5 opacity-50" />
           </button>
           <button 
             onClick={onSignOut}
-            className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+            className="rounded-lg p-2 transition-colors hover:bg-white/5"
             title="Sign out"
           >
-            <LogOut className="w-5 h-5 opacity-50" />
+            <LogOut className="h-5 w-5 opacity-50" />
           </button>
         </div>
       </header>
 
-      {/* Daily Ritual CTA */}
-      {!todayRitual ? (
-        <motion.button
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          onClick={() => setIsRitualOpen(true)}
-          className="w-full mb-6 p-4 rounded-2xl flex items-center justify-center gap-3 hover:scale-[1.01] transition-transform"
-          style={{
-            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(20, 184, 166, 0.15))',
-            border: '2px solid rgba(99, 102, 241, 0.3)',
-          }}
-        >
-          <Sun className="w-5 h-5 text-amber-400" />
-          <span className="font-medium">Start My Day</span>
-          <span className="text-xs opacity-50">60 seconds</span>
-        </motion.button>
-      ) : (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mb-6 p-3 rounded-xl flex items-center justify-between"
-          style={{
-            background: 'rgba(16, 185, 129, 0.1)',
-            border: '1px solid rgba(16, 185, 129, 0.2)',
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-            <div>
-              <p className="text-sm font-medium">Day started</p>
-              {todayRitual.desire && (
-                <p className="text-xs opacity-60 truncate max-w-[200px]">"{todayRitual.desire}"</p>
-              )}
-            </div>
-          </div>
-          <button
+      <div className="mx-auto max-w-xl space-y-5 pb-16">
+        {/* 1 — Check in */}
+        {!todayRitual ? (
+          <motion.button
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
             onClick={() => setIsRitualOpen(true)}
-            className="text-xs opacity-50 hover:opacity-100 transition-opacity"
-          >
-            Do again
-          </button>
-        </motion.div>
-      )}
-
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left Panel - State Sliders */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="p-4 rounded-2xl" style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-          }}>
-            <h2 className="text-xs uppercase tracking-widest opacity-50 mb-4">State Controls</h2>
-            
-            <div className="space-y-5">
-              {sliders.map(slider => (
-                <div key={slider.id}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <slider.icon className="w-4 h-4" style={{ color: slider.color }} />
-                      <span className="text-sm font-medium">{slider.name}</span>
-                    </div>
-                    <span className="text-xs opacity-50">{slider.value}%</span>
-                  </div>
-                  
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={slider.value}
-                    onChange={(e) => handleSliderChange(slider.id, parseInt(e.target.value))}
-                    className="w-full h-2 rounded-full appearance-none cursor-pointer"
-                    style={{
-                      background: `linear-gradient(to right, ${slider.color} 0%, ${slider.color} ${slider.value}%, rgba(255,255,255,0.1) ${slider.value}%, rgba(255,255,255,0.1) 100%)`,
-                    }}
-                  />
-                  <p className="text-xs opacity-40 mt-1">{slider.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="p-4 rounded-2xl" style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-          }}>
-            <h2 className="text-xs uppercase tracking-widest opacity-50 mb-3">System Status</h2>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="opacity-50">Rituals</span>
-                <span>{JSON.parse(localStorage.getItem('awake_ritual_history') || '[]').length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="opacity-50">Tasks Done</span>
-                <span>{JSON.parse(localStorage.getItem('awake_today_tasks') || '[]').filter((t: any) => t.done).length}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Center - Identity Core */}
-        <div className="lg:col-span-6">
-          {/* Avatar & Identity */}
-          <motion.div 
-            className="relative p-6 rounded-3xl mb-6 text-center"
+            className="flex w-full items-center justify-center gap-3 rounded-2xl p-4 transition-transform hover:scale-[1.01]"
             style={{
-              background: 'radial-gradient(ellipse at center, rgba(99, 102, 241, 0.1) 0%, transparent 70%)',
-              border: '1px solid rgba(99, 102, 241, 0.2)',
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(20, 184, 166, 0.15))',
+              border: '2px solid rgba(99, 102, 241, 0.3)',
             }}
           >
-            {/* Animated rings */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <motion.div
-                className="absolute w-32 h-32 rounded-full border border-primary/20"
-                animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.1, 0.3] }}
-                transition={{ duration: 3, repeat: Infinity }}
-              />
-              <motion.div
-                className="absolute w-48 h-48 rounded-full border border-primary/10"
-                animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.05, 0.2] }}
-                transition={{ duration: 4, repeat: Infinity, delay: 0.5 }}
-              />
-            </div>
-
-            {/* Avatar */}
-            <div className="relative z-10">
-              <div className="w-24 h-24 mx-auto mb-4 rounded-full overflow-hidden ring-2 ring-primary/30 ring-offset-2 ring-offset-transparent">
-                {userData.avatar ? (
-                  <img 
-                    src={userData.avatar.replace('.glb', '.png')} 
-                    alt="Avatar"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-primary/30 to-teal-500/30 flex items-center justify-center">
-                    <span className="text-3xl">{userName.charAt(0).toUpperCase()}</span>
-                  </div>
+            <Sun className="h-5 w-5 text-amber-400" />
+            <span className="font-medium">Begin check-in</span>
+            <span className="text-xs opacity-50">~60 sec</span>
+          </motion.button>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="rounded-2xl p-4"
+            style={{
+              background: 'rgba(16, 185, 129, 0.08)',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+            }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-emerald-300/90">Checked in</p>
+                {todayRitual.desire && (
+                  <p className="mt-1 text-sm italic opacity-70">&ldquo;{todayRitual.desire}&rdquo;</p>
+                )}
+                {todayRitual.loaMessage && (
+                  <p className="mt-2 text-xs leading-relaxed opacity-50 line-clamp-2">
+                    {todayRitual.loaMessage}
+                  </p>
                 )}
               </div>
-
-              <h2 className="text-2xl font-medium mb-1">{userName}</h2>
-              
-              {archetypeName && (
-                <p className="text-sm opacity-60 mb-3">{archetypeName}</p>
-              )}
-
-              {userData.intention && (
-                <div className="mt-4 p-3 rounded-xl max-w-sm mx-auto" style={{
-                  background: 'rgba(99, 102, 241, 0.1)',
-                  border: '1px solid rgba(99, 102, 241, 0.2)',
-                }}>
-                  <p className="text-xs uppercase tracking-widest opacity-50 mb-1">Core Intention</p>
-                  <p className="text-sm italic">"{userData.intention}"</p>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => setIsRitualOpen(true)}
+                className="shrink-0 text-xs opacity-40 hover:opacity-80"
+              >
+                Again
+              </button>
             </div>
-
-            {/* Loa Greeting */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="mt-6 p-3 rounded-xl text-center max-w-xs mx-auto"
-              style={{
-                background: 'rgba(99, 102, 241, 0.05)',
-                border: '1px solid rgba(99, 102, 241, 0.1)',
-              }}
-            >
-              <p className="text-sm opacity-70 italic">
-                {todayRitual
-                  ? `"${todayRitual.loaMessage.slice(0, 80)}${todayRitual.loaMessage.length > 80 ? '...' : ''}"`
-                  : loaGreetingLine}
-              </p>
-            </motion.div>
-
-            {/* Talk to Loa button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setIsChatOpen(true)}
-              className="mt-4 px-6 py-3 rounded-full flex items-center gap-2 mx-auto"
-              style={{
-                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(20, 184, 166, 0.2))',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-              }}
-            >
-              <LoaCompanion size={24} />
-              <span className="text-sm font-medium">Talk to Loa</span>
-            </motion.button>
           </motion.div>
+        )}
 
-          {/* Widget Grid */}
-          <div className="grid grid-cols-2 auto-rows-[10.25rem] gap-3 [contain:layout] sm:auto-rows-[11.25rem] sm:gap-3">
-            {widgets.map(widget => (
+        {/* Session progress — the daily container */}
+        <div
+          className="rounded-2xl p-4"
+          style={{
+            background: sessionComplete
+              ? 'rgba(16, 185, 129, 0.08)'
+              : 'rgba(255,255,255,0.03)',
+            border: sessionComplete
+              ? '1px solid rgba(16, 185, 129, 0.25)'
+              : '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-xs uppercase tracking-widest opacity-50">Daily loop</h2>
+            {sessionComplete && (
+              <span className="text-xs text-emerald-400/90">Session complete</span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {sessionSteps.map((step) => (
+              <div
+                key={step.id}
+                className={`flex flex-1 flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center ${
+                  step.done ? 'bg-emerald-500/10' : 'bg-white/[0.03]'
+                }`}
+              >
+                {step.done ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                ) : (
+                  <Circle className="h-4 w-4 opacity-30" />
+                )}
+                <span className="text-[10px] leading-tight opacity-60">{step.label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed opacity-35">
+            {sessionComplete
+              ? 'You showed up inside the container. Come back tomorrow for the next round.'
+              : "Check in → show up to your challenge → complete one move. That's the whole game today."}
+          </p>
+          {sessionComplete && <SessionArtifactPrompt onLogged={() => setSessionTick((n) => n + 1)} />}
+        </div>
+
+        {/* Intention anchor */}
+        {userData.intention && (
+          <div
+            className="rounded-2xl px-4 py-3"
+            style={{
+              background: 'rgba(99, 102, 241, 0.08)',
+              border: '1px solid rgba(99, 102, 241, 0.15)',
+            }}
+          >
+            <p className="text-[10px] uppercase tracking-widest opacity-45">Intention</p>
+            <p className="mt-1 text-sm italic leading-relaxed opacity-85">
+              &ldquo;{userData.intention}&rdquo;
+            </p>
+          </div>
+        )}
+
+        {/* 2 & 3 — Tools (widgets) */}
+        <div>
+          <h2 className="mb-2 text-xs uppercase tracking-widest opacity-40">Your tools</h2>
+          <div className="grid grid-cols-2 auto-rows-[10.25rem] gap-3 sm:auto-rows-[11.25rem]">
+            {sortedWidgets.map((widget) => (
               <WidgetCard 
                 key={widget.id} 
                 widget={widget} 
@@ -479,67 +491,129 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
                 setNewBinItem={setNewBinItem}
                 onRelease={handleReleaseToBin}
                 onRemove={() => handleRemoveWidget(widget.id)}
-                onOpenChat={() => setIsChatOpen(true)}
                 onOpenDomains={() => setIsDomainsOpen(true)}
                 onUpdateUserData={onUpdateUserData}
+                isDragging={draggedWidgetId === widget.id}
+                isDragOver={dragOverWidgetId === widget.id && draggedWidgetId !== widget.id}
+                onDragStart={() => setDraggedWidgetId(widget.id)}
+                onDragEnd={() => {
+                  setDraggedWidgetId(null);
+                  setDragOverWidgetId(null);
+                }}
+                onDragOverCard={() => setDragOverWidgetId(widget.id)}
+                onDragLeaveCard={() => {
+                  setDragOverWidgetId((id) => (id === widget.id ? null : id));
+                }}
+                onDropOnCard={(fromId) => {
+                  handleReorderWidgets(fromId, widget.id);
+                  setDraggedWidgetId(null);
+                  setDragOverWidgetId(null);
+                }}
               />
             ))}
-            
-            {/* Add Widget Button */}
             <button
               type="button"
               onClick={() => setIsWidgetPickerOpen(true)}
-              className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-2 rounded-2xl p-4 transition-colors hover:bg-white/[0.04]"
-              style={{
-                background: 'rgba(255,255,255,0.02)',
-                border: '2px dashed rgba(255,255,255,0.1)',
-              }}
+              className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/10 p-4 transition-colors hover:bg-white/[0.04]"
             >
-              <Plus className="h-6 w-6 opacity-30" />
-              <span className="text-xs opacity-30">Add Widget</span>
+              <Plus className="h-5 w-5 opacity-30" />
+              <span className="text-xs opacity-30">Add tool</span>
             </button>
           </div>
         </div>
 
-        {/* Right Panel - Vision & Paths */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Vision */}
-          {userData.vision && (
-            <div className="p-4 rounded-2xl" style={{
-              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.05), rgba(239, 68, 68, 0.05))',
-              border: '1px solid rgba(245, 158, 11, 0.2)',
-            }}>
-              <div className="flex items-center gap-2 mb-3">
-                <Sun className="w-4 h-4 text-amber-400" />
-                <h2 className="text-xs uppercase tracking-widest opacity-50">My Vision</h2>
-              </div>
-              <p className="text-sm leading-relaxed opacity-80">{userData.vision}</p>
-            </div>
-          )}
-
-          {/* Anti-Vision */}
-          {userData.antiVision && (
-            <div className="p-4 rounded-2xl" style={{
-              background: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(255,255,255,0.08)',
-            }}>
-              <div className="flex items-center gap-2 mb-3">
-                <Moon className="w-4 h-4 opacity-50" />
-                <h2 className="text-xs uppercase tracking-widest opacity-50">What I'm Moving Away From</h2>
-              </div>
-              <p className="text-sm leading-relaxed opacity-60">{userData.antiVision}</p>
-            </div>
-          )}
-
-          {/* Active Paths */}
-          <div className="p-4 rounded-2xl" style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-          }}>
-            <h2 className="text-xs uppercase tracking-widest opacity-50 mb-3">Active Paths</h2>
-            <ActivePathsList />
+        {/* Loa — one entry point */}
+        <motion.button
+          type="button"
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          onClick={() => setIsChatOpen(true)}
+          className="flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-4"
+          style={{
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(20, 184, 166, 0.12))',
+            border: '1px solid rgba(99, 102, 241, 0.25)',
+          }}
+        >
+          <LoaCompanion size={28} />
+          <div className="text-left">
+            <p className="text-sm font-medium">Talk to Loa</p>
+            <p className="text-xs opacity-45">When you need a mirror, not a task list</p>
           </div>
-        </div>
+        </motion.button>
+
+        {/* The framework — works offline, app is sync layer */}
+        <FrameworkPanel />
+
+        {/* North stars — vision / anti-vision */}
+        {(userData.vision || userData.antiVision) && (
+          <div className="space-y-3">
+            {userData.vision && (
+              <div
+                className="rounded-2xl p-4"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.05), transparent)',
+                  border: '1px solid rgba(245, 158, 11, 0.15)',
+                }}
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <Sun className="h-4 w-4 text-amber-400" />
+                  <h2 className="text-xs uppercase tracking-widest opacity-50">Toward</h2>
+                </div>
+                <p className="text-sm leading-relaxed opacity-75">{userData.vision}</p>
+              </div>
+            )}
+            {userData.antiVision && (
+              <div
+                className="rounded-2xl p-4"
+                style={{
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                }}
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <Moon className="h-4 w-4 opacity-50" />
+                  <h2 className="text-xs uppercase tracking-widest opacity-50">Away from</h2>
+                </div>
+                <p className="text-sm leading-relaxed opacity-55">{userData.antiVision}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* State — optional, collapsed */}
+        <details className="group rounded-2xl" style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-sm opacity-60 [&::-webkit-details-marker]:hidden">
+            <span>How are you right now?</span>
+            <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="space-y-4 border-t border-white/5 px-4 pb-4 pt-2">
+            {sliders.map((slider) => (
+              <div key={slider.id}>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <slider.icon className="h-4 w-4" style={{ color: slider.color }} />
+                    <span className="text-sm">{slider.name}</span>
+                  </div>
+                  <span className="text-xs opacity-50">{slider.value}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={slider.value}
+                  onChange={(e) => handleSliderChange(slider.id, parseInt(e.target.value, 10))}
+                  className="h-2 w-full cursor-pointer appearance-none rounded-full"
+                  style={{
+                    background: `linear-gradient(to right, ${slider.color} 0%, ${slider.color} ${slider.value}%, rgba(255,255,255,0.1) ${slider.value}%, rgba(255,255,255,0.1) 100%)`,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </details>
       </div>
 
       {/* Widget Picker Modal */}
@@ -563,7 +637,7 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
                 border: '1px solid rgba(255,255,255,0.1)',
               }}
             >
-              <h2 className="text-lg font-medium mb-4">Pick a Widget</h2>
+              <h2 className="text-lg font-medium mb-4">Add a tool</h2>
               <div className="grid grid-cols-2 gap-3">
                 {WIDGET_TYPES.map(w => (
                   <button
@@ -723,9 +797,15 @@ function WidgetCard({
   setNewBinItem,
   onRelease,
   onRemove,
-  onOpenChat,
   onOpenDomains,
-  onUpdateUserData
+  onUpdateUserData,
+  isDragging,
+  isDragOver,
+  onDragStart,
+  onDragEnd,
+  onDragOverCard,
+  onDragLeaveCard,
+  onDropOnCard,
 }: { 
   widget: Widget;
   userData: UserData;
@@ -734,9 +814,15 @@ function WidgetCard({
   setNewBinItem: (v: string) => void;
   onRelease: () => void;
   onRemove: () => void;
-  onOpenChat: () => void;
   onOpenDomains: () => void;
   onUpdateUserData?: (data: Partial<UserData>) => void;
+  isDragging?: boolean;
+  isDragOver?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  onDragOverCard?: () => void;
+  onDragLeaveCard?: () => void;
+  onDropOnCard?: (fromId: string) => void;
 }) {
   const [isEditingVision, setIsEditingVision] = useState(false);
   const [visionDraft, setVisionDraft] = useState(userData.vision || '');
@@ -756,10 +842,17 @@ function WidgetCard({
           </div>
         );
 
-      case 'loa-today':
+      case 'daily-challenge':
         return (
           <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <LoaTodayWidget userData={userData} />
+            <DailyChallengeWidget />
+          </div>
+        );
+
+      case 'artifacts':
+        return (
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <ArtifactVaultWidget />
           </div>
         );
 
@@ -825,15 +918,6 @@ function WidgetCard({
           </button>
         );
 
-      case 'loa':
-        return (
-          <button type="button" onClick={onOpenChat} className="flex h-full min-h-0 w-full flex-col overflow-hidden text-left">
-            <LoaCompanion size={32} />
-            <p className="mt-2 shrink-0 text-sm font-medium">Quick Chat</p>
-            <p className="text-xs opacity-50">Talk to Loa</p>
-          </button>
-        );
-
       case 'streak': {
         const dayStreak = computeAwakeDayStreak();
         const totalActiveDays = collectActiveDays().size;
@@ -848,28 +932,6 @@ function WidgetCard({
           </div>
         );
       }
-
-      case 'traits': {
-        const traitsArchetype = userData.archetype as Archetype | undefined;
-        return (
-          <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <Brain className="mb-2 h-5 w-5 shrink-0 text-indigo-400" />
-            <p className="mb-1 shrink-0 text-xs opacity-50">Archetype</p>
-            {traitsArchetype ? (
-              <p className="line-clamp-3 text-sm leading-snug">{getArchetypeName(traitsArchetype)}</p>
-            ) : (
-              <p className="text-xs opacity-30">Discover yours</p>
-            )}
-          </div>
-        );
-      }
-
-      case 'paths':
-        return (
-          <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <ActivePathsList compact />
-          </div>
-        );
 
       case 'bin':
         return (
@@ -977,12 +1039,37 @@ function WidgetCard({
 
   return (
     <motion.div
-      className="group relative flex h-full min-h-0 max-h-full flex-col overflow-hidden rounded-2xl p-3 sm:p-4"
+      className={`group relative flex h-full min-h-0 max-h-full flex-col overflow-hidden rounded-2xl p-3 sm:p-4 transition-shadow ${
+        isDragOver ? 'ring-2 ring-indigo-400/60' : ''
+      } ${isDragging ? 'opacity-50' : ''}`}
       style={{
         background: 'rgba(255,255,255,0.03)',
         border: '1px solid rgba(255,255,255,0.08)',
       }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        onDragOverCard?.();
+      }}
+      onDragLeave={() => onDragLeaveCard?.()}
+      onDrop={(e) => {
+        e.preventDefault();
+        const fromId = e.dataTransfer.getData('text/widget-id');
+        if (fromId) onDropOnCard?.(fromId);
+      }}
     >
+      <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/widget-id', widget.id);
+          e.dataTransfer.effectAllowed = 'move';
+          onDragStart?.();
+        }}
+        onDragEnd={() => onDragEnd?.()}
+        className="absolute left-2 top-2 z-10 flex h-6 w-6 cursor-grab items-center justify-center rounded-md opacity-0 transition-opacity active:cursor-grabbing group-hover:opacity-40 hover:opacity-70"
+        title="Drag to reorder"
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </div>
       <button
         type="button"
         onClick={onRemove}
@@ -992,74 +1079,6 @@ function WidgetCard({
       </button>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-0.5">{renderContent()}</div>
     </motion.div>
-  );
-}
-
-// Active Paths List Component
-function ActivePathsList({ compact = false }: { compact?: boolean }) {
-  const [paths, setPaths] = useState<{ id: string; title: string }[]>([]);
-  const [newPath, setNewPath] = useState('');
-
-  useEffect(() => {
-    const saved = localStorage.getItem('awake_active_paths');
-    if (saved) setPaths(JSON.parse(saved));
-  }, []);
-
-  const addPath = () => {
-    if (!newPath.trim()) return;
-    const updated = [...paths, { id: `p-${Date.now()}`, title: newPath.trim() }];
-    setPaths(updated);
-    localStorage.setItem('awake_active_paths', JSON.stringify(updated));
-    setNewPath('');
-    notifyCockpitLocalChanged();
-  };
-
-  if (compact) {
-    return (
-      <div className="flex h-full min-h-0 flex-col overflow-hidden">
-        <Target className="mb-2 h-5 w-5 shrink-0 text-teal-400" />
-        <p className="mb-1 shrink-0 text-xs opacity-50">Active Paths</p>
-        {paths.length > 0 ? (
-          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
-            {paths.slice(0, 4).map((p) => (
-              <p key={p.id} className="truncate text-xs">
-                • {p.title}
-              </p>
-            ))}
-            {paths.length > 4 && <p className="shrink-0 text-xs opacity-50">+{paths.length - 4} more</p>}
-          </div>
-        ) : (
-          <p className="text-xs opacity-30">None yet</p>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {paths.map(p => (
-        <div key={p.id} className="flex items-center gap-2 text-sm">
-          <div className="w-2 h-2 rounded-full bg-teal-400/50" />
-          <span>{p.title}</span>
-        </div>
-      ))}
-      <div className="flex gap-2 mt-3">
-        <input
-          type="text"
-          value={newPath}
-          onChange={(e) => setNewPath(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addPath()}
-          placeholder="Add path..."
-          className="flex-1 p-2 text-xs rounded-lg bg-black/30 border border-white/10 focus:outline-none focus:border-teal-400/50"
-        />
-        <button 
-          onClick={addPath}
-          className="px-3 rounded-lg bg-teal-400/10 hover:bg-teal-400/20 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -1399,99 +1418,280 @@ function PlaybookWidget() {
   );
 }
 
-// Loa Today Widget - Get daily guidance
-function LoaTodayWidget({ userData }: { userData: UserData }) {
-  const [advice, setAdvice] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+// Daily Challenge — user-defined container; showing up is the win
+function DailyChallengeWidget() {
+  const [state, setState] = useState(readDailyChallengeState);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [minimumDraft, setMinimumDraft] = useState('Just show up — that counts.');
+  const [showedToday, setShowedToday] = useState(hasShownUpToday);
+
+  const refresh = () => {
+    setState(readDailyChallengeState());
+    setShowedToday(hasShownUpToday());
+  };
+
+  const streak = computeChallengeStreak();
+
+  const handleCreate = () => {
+    if (!titleDraft.trim()) return;
+    setDailyChallenge(titleDraft, minimumDraft);
+    setTitleDraft('');
+    refresh();
+    notifyCockpitLocalChanged();
+  };
+
+  const toggleShowUp = () => {
+    if (showedToday) {
+      unlogShowUpToday();
+    } else {
+      logShowUpToday();
+      triggerSmallCelebration();
+    }
+    refresh();
+    notifyCockpitLocalChanged();
+  };
+
+  if (!state.challenge) {
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div className="mb-2 flex shrink-0 items-center gap-2">
+          <Trophy className="h-4 w-4 text-amber-400" />
+          <span className="text-xs opacity-50">Daily Challenge</span>
+        </div>
+        <input
+          type="text"
+          value={titleDraft}
+          onChange={(e) => setTitleDraft(e.target.value)}
+          placeholder="Gym, upload, meditate…"
+          className="mb-1.5 w-full shrink-0 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-xs focus:border-amber-400/50 focus:outline-none"
+        />
+        <input
+          type="text"
+          value={minimumDraft}
+          onChange={(e) => setMinimumDraft(e.target.value)}
+          placeholder="Minimum bar"
+          className="mb-2 w-full shrink-0 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-[10px] opacity-80 focus:border-amber-400/50 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={handleCreate}
+          disabled={!titleDraft.trim()}
+          className="mt-auto shrink-0 rounded-lg bg-amber-400/20 py-2 text-xs transition-colors hover:bg-amber-400/30 disabled:opacity-30"
+        >
+          Start challenge
+        </button>
+      </div>
+    );
+  }
+
+  const { challenge } = state;
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="mb-1 flex shrink-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Trophy className="h-4 w-4 shrink-0 text-amber-400" />
+          <span className="truncate text-xs font-medium">{challenge.title}</span>
+        </div>
+        {streak > 0 && (
+          <span className="shrink-0 text-[10px] tabular-nums text-amber-300/90">{streak}d</span>
+        )}
+      </div>
+      <p className="mb-2 line-clamp-2 shrink-0 text-[10px] leading-snug opacity-45">
+        Min: {challenge.minimumBar}
+      </p>
+      <button
+        type="button"
+        onClick={toggleShowUp}
+        className={`flex shrink-0 items-center gap-2 rounded-lg px-2 py-2 text-left text-xs transition-colors ${
+          showedToday
+            ? 'bg-emerald-500/15 text-emerald-300'
+            : 'bg-white/5 hover:bg-white/10'
+        }`}
+      >
+        {showedToday ? (
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+        ) : (
+          <Circle className="h-4 w-4 shrink-0 opacity-50" />
+        )}
+        <span>{showedToday ? 'Showed up today' : 'Log show-up'}</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          clearDailyChallenge();
+          refresh();
+          notifyCockpitLocalChanged();
+        }}
+        className="mt-auto shrink-0 pt-2 text-[9px] opacity-30 hover:opacity-60"
+      >
+        End challenge
+      </button>
+    </div>
+  );
+}
+
+function SessionArtifactPrompt({ onLogged }: { onLogged: () => void }) {
+  const [title, setTitle] = useState('');
+  const [logged, setLogged] = useState(hasArtifactToday);
+
+  if (logged) return null;
+
+  const submit = () => {
+    if (!title.trim()) return;
+    addArtifact({ title: title.trim() });
+    triggerSmallCelebration();
+    setLogged(true);
+    onLogged();
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3">
+      <p className="mb-2 text-[11px] font-medium text-amber-200/80">
+        Log today&apos;s artifact — what did you actually craft?
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+          placeholder="e.g. Sent the one-pager, fixed auth bug..."
+          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-xs focus:border-amber-400/40 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!title.trim()}
+          className="shrink-0 rounded-lg bg-amber-400/20 px-3 py-1.5 text-xs transition-colors hover:bg-amber-400/30 disabled:opacity-30"
+        >
+          Drop
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ArtifactVaultWidget() {
+  const [artifacts, setArtifacts] = useState<Artifact[]>(readArtifacts);
+  const [title, setTitle] = useState('');
+  const [tier, setTier] = useState<ArtifactTier>('bronze');
+
+  const refresh = () => setArtifacts(readArtifacts());
 
   useEffect(() => {
-    const saved = localStorage.getItem('awake_loa_today');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      const today = new Date().toDateString();
-      if (parsed.date === today) {
-        setAdvice(parsed.advice);
-      }
-    }
+    refresh();
+    const bump = () => refresh();
+    window.addEventListener(COCKPIT_SYNC_EVENT, bump);
+    return () => window.removeEventListener(COCKPIT_SYNC_EVENT, bump);
   }, []);
 
-  const askLoa = async () => {
-    setIsLoading(true);
-    try {
-      // Gather context
-      const tasks = JSON.parse(localStorage.getItem('awake_today_tasks') || '[]');
-      const paths = JSON.parse(localStorage.getItem('awake_active_paths') || '[]');
-      const playbook = JSON.parse(localStorage.getItem('awake_playbook') || 'null');
-      const sliders = JSON.parse(localStorage.getItem('awake_cockpit_sliders') || '[]');
-      
-      const energySlider = sliders.find((s: any) => s.id === 'energy');
-      const focusSlider = sliders.find((s: any) => s.id === 'focus');
-
-      const prompt = `Based on where I am right now, what should I focus on today?
-
-My current state:
-- Energy: ${energySlider?.value || 50}/100
-- Focus: ${focusSlider?.value || 50}/100
-${userData.intention ? `- My intention: "${userData.intention}"` : ''}
-
-My active paths: ${paths.map((p: any) => p.title).join(', ') || 'None set'}
-${playbook?.project ? `Current project: ${playbook.project}` : ''}
-Today's tasks: ${tasks.filter((t: any) => !t.done).map((t: any) => t.text).join(', ') || 'None yet'}
-
-Give me ONE clear priority for today. Be specific and direct. 2-3 sentences max.`;
-
-      const response = await aiService.chatWithContext(prompt, userData);
-      setAdvice(response);
-      
-      const today = new Date().toDateString();
-      localStorage.setItem('awake_loa_today', JSON.stringify({ date: today, advice: response }));
-      notifyCockpitLocalChanged();
-    } catch (err) {
-      console.error('Failed to get Loa advice:', err);
-      setAdvice("Focus on what feels most alive right now. Start there.");
-    }
-    setIsLoading(false);
+  const submit = () => {
+    if (!title.trim()) return;
+    addArtifact({ title: title.trim(), tier });
+    triggerSmallCelebration();
+    setTitle('');
+    refresh();
   };
+
+  const tiers: ArtifactTier[] = ['bronze', 'silver', 'gold'];
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="mb-2 flex shrink-0 items-center gap-2">
-        <LoaCompanion size={20} />
-        <span className="text-xs opacity-50">Loa's Advice</span>
+        <Gem className="h-5 w-5 shrink-0 text-amber-400" />
+        <span className="text-xs opacity-50">Artifact Vault</span>
       </div>
-
-      {isLoading ? (
-        <div className="flex flex-1 items-center justify-center py-2">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          >
-            <Sparkles className="h-5 w-5 text-primary" />
-          </motion.div>
-        </div>
-      ) : advice ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <p className="line-clamp-5 min-h-0 flex-1 text-[11px] leading-relaxed opacity-80">{advice}</p>
+      <p className="mb-2 line-clamp-2 shrink-0 text-[9px] leading-snug opacity-35">
+        Proof crafted in the world — not thoughts in your head.
+      </p>
+      <div className="mb-2 flex shrink-0 gap-1">
+        {tiers.map((t) => (
           <button
+            key={t}
             type="button"
-            onClick={askLoa}
-            className="mt-1 shrink-0 text-[10px] opacity-40 transition-opacity hover:opacity-60"
+            onClick={() => setTier(t)}
+            className={`rounded px-2 py-0.5 text-[9px] capitalize transition-colors ${
+              tier === t ? 'bg-white/10' : 'opacity-40 hover:opacity-70'
+            }`}
+            style={tier === t ? { color: tierColor(t) } : undefined}
           >
-            Ask again
+            {t}
           </button>
-        </div>
-      ) : (
+        ))}
+      </div>
+      <div className="mb-2 flex shrink-0 gap-1.5">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+          placeholder="What did you make?"
+          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-[11px] focus:border-amber-400/40 focus:outline-none"
+        />
         <button
           type="button"
-          onClick={askLoa}
-          className="mt-auto w-full shrink-0 rounded-lg py-2 text-xs transition-colors hover:bg-white/5"
-          style={{
-            border: '1px dashed rgba(255,255,255,0.2)',
-          }}
+          onClick={submit}
+          disabled={!title.trim()}
+          className="shrink-0 rounded-lg bg-amber-400/15 px-2 py-1.5 text-[10px] disabled:opacity-30"
         >
-          What should I focus on?
+          <Plus className="h-3.5 w-3.5" />
         </button>
-      )}
+      </div>
+      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+        {artifacts.length === 0 ? (
+          <p className="text-xs opacity-30">No artifacts yet</p>
+        ) : (
+          artifacts.slice(0, 8).map((a) => (
+            <div key={a.id} className="flex items-start gap-2 text-[10px]">
+              <span
+                className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: tierColor(a.tier) }}
+              />
+              <span className="line-clamp-2 leading-snug">{a.title}</span>
+            </div>
+          ))
+        )}
+      </div>
     </div>
+  );
+}
+
+function FrameworkPanel() {
+  return (
+    <details
+      className="group rounded-2xl"
+      style={{
+        background: 'rgba(99, 102, 241, 0.04)',
+        border: '1px solid rgba(99, 102, 241, 0.12)',
+      }}
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-sm [&::-webkit-details-marker]:hidden">
+        <span className="opacity-70">The Awake framework</span>
+        <ChevronDown className="h-4 w-4 opacity-40 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="space-y-3 border-t border-white/5 px-4 pb-4 pt-3 text-xs leading-relaxed opacity-60">
+        <p>
+          Awake is a system for governing your life — not a dashboard. The app is the sync layer;
+          the practice works anywhere.
+        </p>
+        <p className="font-medium opacity-80">Daily session (notebook or app)</p>
+        <ol className="list-decimal space-y-1 pl-4">
+          <li>
+            <span className="opacity-80">Check in</span> — How am I? What matters today?
+          </li>
+          <li>
+            <span className="opacity-80">Show up</span> — Hit the minimum bar on your challenge.
+          </li>
+          <li>
+            <span className="opacity-80">Move</span> — One concrete action. An artifact, not a thought.
+          </li>
+        </ol>
+        <p>
+          Go offline for a week with a notebook. Same three steps. When you return, log what you
+          did — your streak and artifacts pick up where you left off.
+        </p>
+      </div>
+    </details>
   );
 }

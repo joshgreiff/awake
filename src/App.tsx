@@ -5,12 +5,15 @@ import { Button } from './components/ui/button';
 import { OnboardingFlow, type UserData } from './components/OnboardingFlow';
 import { Cockpit } from './components/Cockpit';
 import { AuthModal } from './components/AuthModal';
-import { auth, userData as userDataService, isSupabaseConfigured } from './services/supabase';
+import { auth, userData as userDataService, isSupabaseConfigured, supabase } from './services/supabase';
 import { clearLocalAwakeData } from './utils/clearLocalData';
 import {
   isOnboardingComplete,
+  readOnboardingProgress,
   shouldResumeOnboarding,
+  clearOnboardingProgress,
 } from './utils/onboardingProgress';
+import { bootstrapUserSession } from './utils/sessionBootstrap';
 import type { User } from '@supabase/supabase-js';
 
 type ViewMode = 'landing' | 'onboarding' | 'dashboard';
@@ -39,6 +42,38 @@ export default function App() {
 
   // Initialize auth and load user data
   useEffect(() => {
+    let authSubscription: { unsubscribe: () => void } | undefined;
+
+    const routeGuest = () => {
+      const progress = readOnboardingProgress();
+      if (progress && isSupabaseConfigured()) {
+        // Stale local setup progress — send to landing so they can sign in first
+        setViewMode('landing');
+        setAuthNotice('Sign in to restore your profile from awakeapp.space.');
+        return;
+      }
+
+      const local = localStorage.getItem('awake_user_data');
+      const data = local ? (JSON.parse(local) as UserData) : null;
+      const resume = shouldResumeOnboarding(data);
+
+      if (resume) {
+        setViewMode('onboarding');
+        if (resume.userData && Object.keys(resume.userData).length > 0) {
+          setUserData(resume.userData);
+        }
+      } else if (data && isOnboardingComplete(data)) {
+        setUserData(data);
+        setViewMode('dashboard');
+      }
+    };
+
+    const routeSignedIn = async () => {
+      const boot = await bootstrapUserSession();
+      if (boot.data) setUserData(boot.data);
+      setViewMode(boot.view === 'landing' ? 'onboarding' : boot.view);
+    };
+
     const init = async () => {
       try {
         const callbackNotice = consumeAuthCallbackNotice();
@@ -46,82 +81,39 @@ export default function App() {
           setAuthNotice(callbackNotice);
         }
 
-        // Check for authenticated user (with timeout)
-        let currentUser: User | null = null;
         if (isSupabaseConfigured()) {
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('timeout')), 5000)
-          );
-          
-          try {
-            currentUser = await Promise.race([
-              auth.getUser(),
-              timeoutPromise
-            ]) as User | null;
-            setUser(currentUser);
-          } catch (e) {
-            console.log('Auth check timed out or failed, continuing without auth');
-          }
+          const session = await auth.getSession();
+          const currentUser = session?.user ?? null;
+          setUser(currentUser);
 
-          // Listen for auth changes
-          auth.onAuthStateChange(async (event, session) => {
-            setUser(session?.user ?? null);
+          const {
+            data: { subscription },
+          } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+              setUser(nextSession?.user ?? null);
 
-            if (event === 'SIGNED_OUT') {
-              clearLocalAwakeData();
-              setUserData(null);
-              setViewMode('landing');
-              return;
-            }
-            
-            if (event === 'SIGNED_IN' && session?.user) {
-              const resume = shouldResumeOnboarding(null);
-              if (resume) {
-                setViewMode('onboarding');
+              if (event === 'SIGNED_OUT') {
+                clearLocalAwakeData();
+                clearOnboardingProgress();
+                setUserData(null);
+                setViewMode('landing');
                 return;
               }
 
-              // Sync local data to cloud on first sign in
-              await userDataService.syncLocalToCloud();
-              // Reload user data from cloud
-              const data = await userDataService.load();
-              if (data) {
-                setUserData(data);
-                if (data.identity?.name) {
-                  setViewMode('dashboard');
-                }
+              // Cold start is handled in init(); only react to fresh sign-ins here
+              if (event === 'SIGNED_IN' && nextSession?.user) {
+                await routeSignedIn();
               }
-            }
-          });
-        }
+            });
+          authSubscription = subscription;
 
-        // Load user data (try Supabase first, fall back to localStorage)
-        let data: UserData | null = null;
-        try {
-          data = await Promise.race([
-            userDataService.load(),
-            new Promise<UserData | null>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
-          ]) as UserData | null;
-        } catch (e) {
-          const local = localStorage.getItem('awake_user_data');
-          data = local ? JSON.parse(local) : null;
-        }
-
-        const resumeOnboarding = shouldResumeOnboarding(data);
-
-        if (resumeOnboarding) {
-          setViewMode('onboarding');
-          if (resumeOnboarding.userData && Object.keys(resumeOnboarding.userData).length > 0) {
-            setUserData(resumeOnboarding.userData);
-          }
-        } else if (data) {
-          setUserData(data);
-          if (isOnboardingComplete(data) && currentUser) {
-            setViewMode('dashboard');
-          } else if (isOnboardingComplete(data)) {
-            setViewMode('dashboard');
+          if (currentUser) {
+            await routeSignedIn();
+            setIsLoading(false);
+            return;
           }
         }
+
+        routeGuest();
       } catch (err) {
         console.error('Init error:', err);
       }
@@ -129,16 +121,17 @@ export default function App() {
       setIsLoading(false);
     };
 
-    init();
+    void init();
+
+    return () => {
+      authSubscription?.unsubscribe();
+    };
   }, []);
 
-  // Handle onboarding completion — navigate immediately; cloud save in background
-  const handleOnboardingComplete = (data: UserData) => {
+  // Handle onboarding completion — must save to cloud before dashboard
+  const handleOnboardingComplete = async (data: UserData) => {
     setUserData(data);
     setViewMode('dashboard');
-    void userDataService.save(data).catch((err) => {
-      console.error('Error saving user data:', err);
-    });
   };
 
   // Show onboarding flow
@@ -146,11 +139,11 @@ export default function App() {
     return <OnboardingFlow onComplete={handleOnboardingComplete} />;
   }
 
-  // Sign out — end session; local journey data cleared; cloud profile kept for next login
+  // Sign out — sync profile to cloud first, then clear local session data
   const handleSignOut = async () => {
-    clearLocalAwakeData();
-    setUserData(null);
-    setViewMode('landing');
+    if (userData) {
+      await userDataService.save(userData);
+    }
 
     try {
       await auth.signOut();
@@ -158,6 +151,10 @@ export default function App() {
       console.error('Sign out error:', err);
     }
 
+    clearLocalAwakeData();
+    localStorage.removeItem('awake_onboarding_progress');
+    setUserData(null);
+    setViewMode('landing');
     setUser(null);
   };
 
@@ -301,18 +298,10 @@ export default function App() {
           >
             <Button
               onClick={async () => {
-                // If already signed in, check for existing data
                 if (user) {
-                  // Try to load/sync data first
-                  await userDataService.syncLocalToCloud();
-                  const data = await userDataService.load();
-                  
-                  if (data?.identity?.name) {
-                    setUserData(data);
-                    setViewMode('dashboard');
-                  } else {
-                    setViewMode('onboarding');
-                  }
+                  const { view, data } = await bootstrapUserSession();
+                  if (data) setUserData(data);
+                  setViewMode(view === 'landing' ? 'onboarding' : view);
                 } else {
                   setShowAuthModal(true);
                 }
@@ -329,12 +318,9 @@ export default function App() {
             {user && userData?.identity?.name && (
               <Button
                 onClick={async () => {
-                  await userDataService.syncLocalToCloud();
-                  const data = await userDataService.load();
-                  if (data?.identity?.name) {
-                    setUserData(data);
-                    setViewMode('dashboard');
-                  }
+                  const { view, data } = await bootstrapUserSession();
+                  if (data) setUserData(data);
+                  setViewMode(view === 'landing' ? 'dashboard' : view);
                 }}
                 variant="outline"
                 className="px-8 py-6 rounded-full text-base cursor-pointer"
@@ -410,17 +396,9 @@ export default function App() {
         onClose={() => setShowAuthModal(false)}
         onSuccess={async () => {
           setShowAuthModal(false);
-          
-          // Sync local data to cloud and reload
-          await userDataService.syncLocalToCloud();
-          const data = await userDataService.load();
-          
-          if (data?.identity?.name) {
-            setUserData(data);
-            setViewMode('dashboard');
-          } else {
-            setViewMode('onboarding');
-          }
+          const { view, data } = await bootstrapUserSession();
+          if (data) setUserData(data);
+          setViewMode(view === 'landing' ? 'onboarding' : view);
         }}
         onContinueAsGuest={() => {
           setShowAuthModal(false);

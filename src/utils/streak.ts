@@ -48,7 +48,21 @@ export function collectActiveDays(): Set<string> {
     dayKeyFromISO((item as { timestamp?: string }).timestamp || '')
   );
 
-  // Daily Reflection also writes lastDate as toDateString() — count that day even if the array entry is missing/old shape
+  try {
+    const challengeRaw = localStorage.getItem('awake_daily_challenge');
+    if (challengeRaw) {
+      const { logs } = JSON.parse(challengeRaw) as { logs?: Record<string, unknown> };
+      if (logs && typeof logs === 'object') {
+        for (const key of Object.keys(logs)) {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(key)) days.add(key);
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // Daily Reflection also writes lastDate as toDateString()
   try {
     const raw = localStorage.getItem('awake_reflection_streak');
     if (raw) {

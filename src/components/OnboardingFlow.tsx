@@ -11,12 +11,18 @@ import type { Archetype } from '../types/archetype';
 import type { DomainId, DomainState } from '../types/domains';
 import {
   clearOnboardingProgress,
+  isOnboardingComplete,
   readOnboardingProgress,
   writeOnboardingProgress,
 } from '../utils/onboardingProgress';
+import { bootstrapUserSession } from '../utils/sessionBootstrap';
+import { auth, isSupabaseConfigured, userData as userDataService } from '../services/supabase';
+import { AuthModal } from './AuthModal';
+import { AwakeLogo } from './AwakeLogo';
+import type { User } from '@supabase/supabase-js';
 
 interface OnboardingFlowProps {
-  onComplete: (userData: UserData) => void;
+  onComplete: (userData: UserData) => void | Promise<void>;
 }
 
 // User data structure
@@ -63,34 +69,118 @@ type Stage =
   | 'unlock';
 
 function getInitialOnboardingState(): { stage: Stage; userData: UserData } {
+  const localRaw = localStorage.getItem('awake_user_data');
+  const localData = localRaw ? (JSON.parse(localRaw) as UserData) : {};
   const saved = readOnboardingProgress();
+
   if (saved) {
-    return { stage: saved.stage as Stage, userData: saved.userData };
+    return {
+      stage: saved.stage as Stage,
+      userData: { ...localData, ...saved.userData },
+    };
   }
-  return { stage: 'awakening', userData: {} };
+  return { stage: 'awakening', userData: localData };
 }
 
 export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const initial = getInitialOnboardingState();
   const [stage, setStage] = useState<Stage>(initial.stage);
   const [userData, setUserData] = useState<UserData>(initial.userData);
+  const [checkingAccount, setCheckingAccount] = useState(true);
+  const [accountUser, setAccountUser] = useState<User | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const userDataRef = useRef(userData);
   userDataRef.current = userData;
+
+  const tryRestoreAccount = useCallback(async () => {
+    setSyncStatus(null);
+    const { view, data } = await bootstrapUserSession();
+    if (view === 'dashboard' && data) {
+      clearOnboardingProgress();
+      onComplete(data);
+      return true;
+    }
+    if (data && isOnboardingComplete(data)) {
+      clearOnboardingProgress();
+      onComplete(data);
+      return true;
+    }
+    if (data && Object.keys(data).length > 0) {
+      setUserData((prev) => ({ ...data, ...prev }));
+    }
+    setSyncStatus(
+      accountUser
+        ? 'No saved profile for this account yet — finish setup below (saves to cloud).'
+        : null
+    );
+    return false;
+  }, [accountUser, onComplete]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setCheckingAccount(false);
+      return;
+    }
+
+    void auth.getUser().then(setAccountUser);
+  }, []);
+
+  // Signed-in users with a cloud profile skip setup
+  useEffect(() => {
+    let cancelled = false;
+
+    void tryRestoreAccount().then((restored) => {
+      if (!cancelled && !restored) {
+        setCheckingAccount(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tryRestoreAccount]);
 
   // Persist after every step (including awakening)
   useEffect(() => {
     writeOnboardingProgress({ stage, userData });
   }, [stage, userData]);
 
+  const persistProgress = useCallback((next: UserData) => {
+    if (!next.identity?.name?.trim()) return;
+    void userDataService.save(next).catch((err) => {
+      console.error('Failed to sync onboarding progress:', err);
+    });
+  }, []);
+
   const updateUserData = (key: keyof UserData, data: UserData[keyof UserData]) => {
-    setUserData((prev) => ({ ...prev, [key]: data }));
+    setUserData((prev) => {
+      const next = { ...prev, [key]: data };
+      persistProgress(next);
+      return next;
+    });
   };
 
-  const handleComplete = useCallback(() => {
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleComplete = useCallback(async () => {
     const finalData = userDataRef.current;
+    setIsSaving(true);
+    setSaveError(null);
+
+    const result = await userDataService.save(finalData);
     localStorage.setItem('awake_user_data', JSON.stringify(finalData));
+
+    if (!result.ok) {
+      setSaveError(result.error);
+      setIsSaving(false);
+      return;
+    }
+
     clearOnboardingProgress();
-    onComplete(finalData);
+    await onComplete(finalData);
+    setIsSaving(false);
   }, [onComplete]);
 
   const stages: { id: Stage; component: React.ReactNode }[] = [
@@ -103,11 +193,17 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     {
       id: 'identity',
       component: (
-        <NamesOfBecoming 
+        <NamesOfBecoming
+          initialName={userData.identity?.name}
+          initialPronouns={userData.identity?.pronouns}
           onContinue={(data) => {
-            updateUserData('identity', data);
+            updateUserData('identity', {
+              name: data.name,
+              pronouns: data.pronouns,
+              alias: data.generatedAlias,
+            });
             setStage('archetype');
-          }} 
+          }}
         />
       )
     },
@@ -151,7 +247,9 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       component: (
         <DashboardUnlock 
           userData={userData}
-          onEnter={handleComplete} 
+          onEnter={() => void handleComplete()}
+          isSaving={isSaving}
+          saveError={saveError}
         />
       )
     }
@@ -160,8 +258,61 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const currentStageIndex = stages.findIndex(s => s.id === stage);
   const currentStage = stages[currentStageIndex];
 
+  if (checkingAccount) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <AwakeLogo size="medium" />
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full min-h-screen overflow-hidden bg-background">
+      {isSupabaseConfigured() && (
+        <div className="fixed top-12 right-4 left-4 z-50 mx-auto max-w-md">
+          {accountUser ? (
+            <div
+              className="rounded-xl border border-white/10 bg-black/60 px-3 py-2 text-center text-xs backdrop-blur-sm"
+            >
+              <span className="opacity-60">Signed in as {accountUser.email}</span>
+              {' · '}
+              <button
+                type="button"
+                onClick={() => void tryRestoreAccount()}
+                className="text-teal-300 hover:underline"
+              >
+                Sync account
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowAuthModal(true)}
+              className="w-full rounded-xl border border-indigo-400/30 bg-indigo-500/10 px-4 py-2.5 text-xs text-indigo-200 backdrop-blur-sm transition-colors hover:bg-indigo-500/20"
+            >
+              Already set up on awakeapp.space? Sign in to restore your profile
+            </button>
+          )}
+          {syncStatus && (
+            <p className="mt-2 text-center text-[11px] text-amber-200/80">{syncStatus}</p>
+          )}
+        </div>
+      )}
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={async () => {
+          setShowAuthModal(false);
+          const u = await auth.getUser();
+          setAccountUser(u);
+          clearOnboardingProgress();
+          await tryRestoreAccount();
+          setCheckingAccount(false);
+        }}
+        onContinueAsGuest={() => setShowAuthModal(false)}
+      />
+
       {/* Progress indicator */}
       <div className="fixed top-0 left-0 right-0 z-50">
         <div className="h-1 bg-muted">

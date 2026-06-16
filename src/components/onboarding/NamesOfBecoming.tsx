@@ -5,12 +5,14 @@ import { Button } from '../ui/button';
 import { Sparkles, User } from 'lucide-react';
 
 interface NamesOfBecomingProps {
+  initialName?: string;
+  initialPronouns?: string;
   onContinue: (data: { name: string; pronouns: string; generatedAlias?: string }) => void;
 }
 
-export function NamesOfBecoming({ onContinue }: NamesOfBecomingProps) {
-  const [name, setName] = useState('');
-  const [pronouns, setPronouns] = useState('');
+export function NamesOfBecoming({ initialName, initialPronouns, onContinue }: NamesOfBecomingProps) {
+  const [name, setName] = useState(initialName ?? '');
+  const [pronouns, setPronouns] = useState(initialPronouns ?? '');
   const [showAlias, setShowAlias] = useState(false);
 
   const generatedAliases = [

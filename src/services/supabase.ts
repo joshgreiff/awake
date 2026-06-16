@@ -9,6 +9,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { UserData } from '../components/OnboardingFlow';
+import { isOnboardingComplete } from '../utils/onboardingProgress';
+import { normalizeUserData, type SaveResult } from '../utils/userDataNormalize';
 import { getAuthRedirectUrl } from '../utils/authRedirect';
 import { applyCockpitSyncToLocalStorage, buildCockpitSyncSnapshot, notifyCockpitLocalChanged } from '../utils/cockpitCloudSync';
 import {
@@ -134,9 +136,13 @@ export const auth = {
     if (error) throw error;
   },
 
-  // Get current user
+  // Get current user (validated with auth server when online)
   async getUser() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) {
+      const { data: { session } } = await supabase.auth.getSession();
+      return session?.user ?? null;
+    }
     return user;
   },
 
@@ -152,110 +158,166 @@ export const auth = {
   },
 };
 
+export type { SaveResult } from '../utils/userDataNormalize';
+
 /**
  * User Data Service
  */
 export const userData = {
-  // Save user data (creates or updates)
-  async save(data: UserData) {
-    const payload: UserData = {
-      ...data,
-      cockpitSync: data.cockpitSync ?? buildCockpitSyncSnapshot(),
+  async getAuthUser(): Promise<{ id: string; email?: string } | null> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      return { id: session.user.id, email: session.user.email };
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) return { id: user.id, email: user.email };
+    return null;
+  },
+
+  async fetchCloudProfile(userId: string): Promise<UserData | null> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('user_data')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Cloud profile fetch failed:', error.message, error.code);
+      return null;
+    }
+
+    const raw = data?.user_data;
+    if (!raw || typeof raw !== 'object') return null;
+    const parsed = raw as UserData;
+    if (Object.keys(parsed).length === 0) return null;
+    return parsed;
+  },
+
+  mergeUserData(base: UserData | null | undefined, patch: UserData): UserData {
+    return {
+      ...base,
+      ...patch,
+      identity: patch.identity
+        ? { ...base?.identity, ...patch.identity }
+        : base?.identity,
+      domains: patch.domains ? { ...base?.domains, ...patch.domains } : base?.domains,
+      cockpitSync: patch.cockpitSync ?? base?.cockpitSync,
     };
-    // Always save to localStorage first (guaranteed to work)
-    localStorage.setItem('awake_user_data', JSON.stringify(payload));
-    
-    const user = await Promise.race([
-      auth.getUser(),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
-    ]);
-    if (!user) {
-      // Not logged in - localStorage only
-      return;
-    }
+  },
 
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          user_data: payload,
-          updated_at: new Date().toISOString(),
-        });
+  // Save user data (creates or updates) — returns result so callers know if cloud worked
+  async save(data: UserData): Promise<SaveResult> {
+    const authUser = await this.getAuthUser();
+    const normalized = normalizeUserData(data);
 
-      if (error) {
-        console.error('Failed to save to Supabase:', error);
-        // Don't throw - localStorage backup exists
+    let payload: UserData = {
+      ...normalized,
+      cockpitSync: normalized.cockpitSync ?? buildCockpitSyncSnapshot(),
+    };
+
+    if (authUser) {
+      const cloud = await this.fetchCloudProfile(authUser.id);
+      if (cloud) {
+        payload = this.mergeUserData(cloud, payload);
       }
-    } catch (err) {
-      console.error('Supabase save error:', err);
-      // Don't throw - localStorage backup exists
+      if (isOnboardingComplete(cloud) && !isOnboardingComplete(normalized)) {
+        payload = cloud!;
+      }
     }
+
+    payload = normalizeUserData(payload);
+    localStorage.setItem('awake_user_data', JSON.stringify(payload));
+
+    if (!authUser) {
+      return { ok: true };
+    }
+
+    const row = {
+      id: authUser.id,
+      email: authUser.email ?? null,
+      user_data: payload,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('profiles')
+      .upsert(row, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Failed to save to Supabase:', error.message, error.code, error.details);
+      return { ok: false, error: error.message, localOnly: true };
+    }
+
+    if (isOnboardingComplete(payload)) {
+      const verify = await this.fetchCloudProfile(authUser.id);
+      if (!isOnboardingComplete(verify)) {
+        return {
+          ok: false,
+          error: 'Save appeared to succeed but profile did not persist. Check Supabase RLS policies.',
+          localOnly: true,
+        };
+      }
+    }
+
+    return { ok: true };
   },
 
   // Load user data
   async load(): Promise<UserData | null> {
-    const user = await auth.getUser();
-    
-    if (!user) {
-      // Not logged in - try localStorage
-      const local = localStorage.getItem('awake_user_data');
-      const parsed = local ? JSON.parse(local) : null;
-      if (parsed?.cockpitSync) {
-        applyCockpitSyncToLocalStorage(parsed.cockpitSync);
+    const authUser = await this.getAuthUser();
+    const localRaw = localStorage.getItem('awake_user_data');
+    const localData = localRaw ? (JSON.parse(localRaw) as UserData) : null;
+
+    if (!authUser) {
+      if (localData?.cockpitSync) {
+        applyCockpitSyncToLocalStorage(localData.cockpitSync);
       }
-      return parsed;
+      return localData;
     }
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('user_data')
-      .eq('id', user.id)
-      .single();
+    const cloudData = await this.fetchCloudProfile(authUser.id);
+    const cloudComplete = isOnboardingComplete(cloudData);
+    const localComplete = isOnboardingComplete(localData);
 
-    if (error) {
-      // Fall back to localStorage
-      const local = localStorage.getItem('awake_user_data');
-      const parsed = local ? JSON.parse(local) : null;
-      if (parsed?.cockpitSync) {
-        applyCockpitSyncToLocalStorage(parsed.cockpitSync);
+    let resolved: UserData | null = null;
+
+    if (cloudComplete) {
+      resolved = cloudData;
+    } else if (localComplete) {
+      resolved = localData;
+      void this.save(localData!);
+    } else if (cloudData && Object.keys(cloudData).length > 0) {
+      resolved = cloudData;
+    } else {
+      resolved = localData;
+    }
+
+    if (resolved) {
+      localStorage.setItem('awake_user_data', JSON.stringify(resolved));
+      if (resolved.cockpitSync) {
+        applyCockpitSyncToLocalStorage(resolved.cockpitSync);
       }
-      return parsed;
     }
 
-    // Update localStorage with cloud data
-    if (data?.user_data) {
-      localStorage.setItem('awake_user_data', JSON.stringify(data.user_data));
-      applyCockpitSyncToLocalStorage(data.user_data.cockpitSync);
-    }
-
-    return data?.user_data || null;
+    return resolved;
   },
 
   // Merge local data with cloud (for first-time sync)
   async syncLocalToCloud() {
-    const user = await auth.getUser();
-    if (!user) return;
+    const authUser = await this.getAuthUser();
+    if (!authUser) return;
 
-    const local = localStorage.getItem('awake_user_data');
-    if (!local) return;
+    const localRaw = localStorage.getItem('awake_user_data');
+    const localData = localRaw ? (JSON.parse(localRaw) as UserData) : null;
 
-    const localData = JSON.parse(local);
-    // Attach latest cockpit keys so first sign-in uploads rituals/tasks/widgets too
-    localData.cockpitSync = buildCockpitSyncSnapshot();
+    const cloudData = await this.fetchCloudProfile(authUser.id);
 
-    // Check if cloud has data
-    const { data: cloudData } = await supabase
-      .from('profiles')
-      .select('user_data')
-      .eq('id', user.id)
-      .single();
+    if (isOnboardingComplete(cloudData)) return;
 
-    if (!cloudData?.user_data) {
-      // Cloud is empty, upload local data (includes cockpit snapshot)
+    if (localData && isOnboardingComplete(localData)) {
+      localData.cockpitSync = buildCockpitSyncSnapshot();
       await this.save(localData);
     }
-    // If cloud has data, it takes precedence (already loaded)
   },
 };
 

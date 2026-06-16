@@ -16,5 +16,6 @@ export interface CockpitSyncState {
   reflectionStreak: { count: number; lastDate: string } | null;
   /** Multi-chat v1 object or legacy flat message[] */
   chatHistory: unknown;
+  artifacts: unknown[];
   updatedAt: string;
 }
