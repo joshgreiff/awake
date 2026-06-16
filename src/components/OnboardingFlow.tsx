@@ -310,7 +310,6 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           await tryRestoreAccount();
           setCheckingAccount(false);
         }}
-        onContinueAsGuest={() => setShowAuthModal(false)}
       />
 
       {/* Progress indicator */}

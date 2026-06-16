@@ -1,12 +1,12 @@
 /**
  * Auth Modal Component
- * 
- * Sign in / Sign up with email or Google
+ *
+ * Sign in / Sign up with email
  */
 
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Mail, Loader2, Chrome, User, ArrowRight } from 'lucide-react';
+import { Mail, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -17,12 +17,11 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  onContinueAsGuest: () => void;
 }
 
-type Mode = 'signin' | 'signup';
+type Mode = 'signin' | 'signup' | 'forgot';
 
-export function AuthModal({ isOpen, onClose, onSuccess, onContinueAsGuest }: AuthModalProps) {
+export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -98,20 +97,28 @@ export function AuthModal({ isOpen, onClose, onSuccess, onContinueAsGuest }: Aut
     setIsLoading(false);
   };
 
-  const handleGoogleAuth = async () => {
-    setError(null);
-    setIsLoading(true);
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    resetFormMessages();
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setError('Enter your email address.');
+      return;
+    }
 
+    setIsLoading(true);
     try {
-      await auth.signInWithGoogle();
-      // Will redirect to Google, then back
+      await auth.requestPasswordReset(normalizedEmail);
+      setSuccessMessage(
+        'Reset link sent — check your inbox and spam folder. The link opens Awake so you can set a new password.'
+      );
     } catch (err) {
       setError(formatAuthError(err));
-      setIsLoading(false);
     }
+    setIsLoading(false);
   };
 
-  // If Supabase isn't configured, just show guest option
+  // If Supabase isn't configured, show setup notice
   if (!isSupabaseConfigured()) {
     return (
       <motion.div
@@ -127,17 +134,13 @@ export function AuthModal({ isOpen, onClose, onSuccess, onContinueAsGuest }: Aut
           onClick={e => e.stopPropagation()}
         >
           <AwakeLogo size="medium" />
-          <h2 className="text-xl font-semibold mt-6 mb-2">Welcome to Awake</h2>
+          <h2 className="text-xl font-semibold mt-6 mb-2">Sign-in unavailable</h2>
           <p className="text-muted-foreground text-sm mb-6">
-            Your journey to becoming a conscious author begins here.
+            Cloud sync is not configured for this environment.
           </p>
-          <Button onClick={onContinueAsGuest} className="w-full gap-2">
-            <ArrowRight className="w-4 h-4" />
-            Begin Journey
+          <Button onClick={onClose} variant="outline" className="w-full">
+            Close
           </Button>
-          <p className="text-xs text-muted-foreground mt-4">
-            Data saved locally on this device
-          </p>
         </motion.div>
       </motion.div>
     );
@@ -160,37 +163,68 @@ export function AuthModal({ isOpen, onClose, onSuccess, onContinueAsGuest }: Aut
         <div className="p-6 text-center border-b border-primary/20">
           <AwakeLogo size="medium" />
           <h2 className="text-xl font-semibold mt-4">
-            {mode === 'signin' ? 'Welcome Back' : 'Begin Your Journey'}
+            {mode === 'signin' && 'Welcome Back'}
+            {mode === 'signup' && 'Begin Your Journey'}
+            {mode === 'forgot' && 'Reset password'}
           </h2>
           <p className="text-muted-foreground text-sm mt-1">
-            {mode === 'signin' 
-              ? 'Sign in to sync your progress' 
-              : 'Create an account to save your journey'}
+            {mode === 'signin' && 'Sign in to sync your progress'}
+            {mode === 'signup' && 'Create an account to save your journey'}
+            {mode === 'forgot' && 'We\'ll email you a link to set a new password'}
           </p>
         </div>
 
         <div className="p-6 space-y-4">
-          {/* Google Sign In */}
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            onClick={handleGoogleAuth}
-            disabled={isLoading}
-          >
-            <Chrome className="w-4 h-4" />
-            Continue with Google
-          </Button>
+          {mode === 'forgot' ? (
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  autoFocus
+                />
+              </div>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-primary/20" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-[#0a0514] px-2 text-muted-foreground">or</span>
-            </div>
-          </div>
+              {successMessage && (
+                <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3">
+                  <p className="text-sm text-green-400">{successMessage}</p>
+                </div>
+              )}
 
-          {/* Email Form */}
+              {error && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+                  <p className="text-sm text-red-400">{error}</p>
+                </div>
+              )}
+
+              <Button type="submit" className="w-full gap-2" disabled={isLoading}>
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4" />
+                )}
+                Send reset link
+              </Button>
+
+              <p className="text-center text-sm text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('signin');
+                    resetFormMessages();
+                  }}
+                  className="text-primary hover:underline"
+                >
+                  Back to sign in
+                </button>
+              </p>
+            </form>
+          ) : (
           <form onSubmit={handleEmailAuth} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -205,7 +239,21 @@ export function AuthModal({ isOpen, onClose, onSuccess, onContinueAsGuest }: Aut
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                {mode === 'signin' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('forgot');
+                      resetFormMessages();
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -258,8 +306,9 @@ export function AuthModal({ isOpen, onClose, onSuccess, onContinueAsGuest }: Aut
               {mode === 'signin' ? 'Sign In' : 'Create Account'}
             </Button>
           </form>
+          )}
 
-          {/* Toggle Mode */}
+          {mode !== 'forgot' && (
           <p className="text-center text-sm text-muted-foreground">
             {mode === 'signin' ? (
               <>
@@ -289,20 +338,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, onContinueAsGuest }: Aut
               </>
             )}
           </p>
-
-          {/* Guest Option */}
-          <div className="pt-4 border-t border-primary/20">
-            <button
-              onClick={onContinueAsGuest}
-              className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-2"
-            >
-              <User className="w-4 h-4" />
-              Continue as Guest
-            </button>
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              Your data will only be saved on this device
-            </p>
-          </div>
+          )}
         </div>
       </motion.div>
     </motion.div>

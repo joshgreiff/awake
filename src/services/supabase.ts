@@ -47,8 +47,20 @@ export function formatAuthError(err: unknown): string {
   if (message.toLowerCase().includes('user already registered')) {
     return 'This email already has an account. Sign in instead.';
   }
+  if (message.toLowerCase().includes('password')) {
+    return message;
+  }
 
   return message;
+}
+
+export function isPasswordRecoveryUrl(): boolean {
+  if (typeof window === 'undefined') return false;
+  const { search, hash } = window.location;
+  return (
+    hash.includes('type=recovery') ||
+    search.includes('type=recovery')
+  );
 }
 
 // Types for our database
@@ -116,6 +128,18 @@ export const auth = {
     });
     if (error) throw error;
     return data;
+  },
+
+  async requestPasswordReset(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: getAuthRedirectUrl(),
+    });
+    if (error) throw error;
+  },
+
+  async updatePassword(password: string) {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
   },
 
   // Sign in with Google

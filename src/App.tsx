@@ -5,7 +5,8 @@ import { Button } from './components/ui/button';
 import { OnboardingFlow, type UserData } from './components/OnboardingFlow';
 import { Cockpit } from './components/Cockpit';
 import { AuthModal } from './components/AuthModal';
-import { auth, userData as userDataService, isSupabaseConfigured, supabase } from './services/supabase';
+import { ResetPasswordModal } from './components/ResetPasswordModal';
+import { auth, userData as userDataService, isSupabaseConfigured, isPasswordRecoveryUrl, supabase } from './services/supabase';
 import { clearLocalAwakeData } from './utils/clearLocalData';
 import {
   isOnboardingComplete,
@@ -22,6 +23,9 @@ type ViewMode = 'landing' | 'onboarding' | 'dashboard';
 function consumeAuthCallbackNotice(): string | null {
   if (typeof window === 'undefined') return null;
   const { search, hash } = window.location;
+  if (hash.includes('type=recovery') || search.includes('type=recovery')) {
+    return null;
+  }
   const isCallback =
     search.includes('code=') ||
     hash.includes('access_token=') ||
@@ -37,6 +41,7 @@ export default function App() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -62,6 +67,9 @@ export default function App() {
         if (resume.userData && Object.keys(resume.userData).length > 0) {
           setUserData(resume.userData);
         }
+      } else if (data && isOnboardingComplete(data) && isSupabaseConfigured()) {
+        setViewMode('landing');
+        setAuthNotice('Sign in to continue your journey.');
       } else if (data && isOnboardingComplete(data)) {
         setUserData(data);
         setViewMode('dashboard');
@@ -99,15 +107,24 @@ export default function App() {
                 return;
               }
 
+              if (event === 'PASSWORD_RECOVERY') {
+                setShowPasswordReset(true);
+                return;
+              }
+
               // Cold start is handled in init(); only react to fresh sign-ins here
-              if (event === 'SIGNED_IN' && nextSession?.user) {
+              if (event === 'SIGNED_IN' && nextSession?.user && !isPasswordRecoveryUrl()) {
                 await routeSignedIn();
               }
             });
           authSubscription = subscription;
 
           if (currentUser) {
-            await routeSignedIn();
+            if (isPasswordRecoveryUrl()) {
+              setShowPasswordReset(true);
+            } else {
+              await routeSignedIn();
+            }
             setIsLoading(false);
             return;
           }
@@ -128,6 +145,14 @@ export default function App() {
     };
   }, []);
 
+  const handlePasswordResetComplete = async () => {
+    setShowPasswordReset(false);
+    setAuthNotice('Password updated — you\'re signed in.');
+    const boot = await bootstrapUserSession();
+    if (boot.data) setUserData(boot.data);
+    setViewMode(boot.view === 'landing' ? 'onboarding' : boot.view);
+  };
+
   // Handle onboarding completion — must save to cloud before dashboard
   const handleOnboardingComplete = async (data: UserData) => {
     setUserData(data);
@@ -136,7 +161,15 @@ export default function App() {
 
   // Show onboarding flow
   if (viewMode === 'onboarding') {
-    return <OnboardingFlow onComplete={handleOnboardingComplete} />;
+    return (
+      <>
+        <OnboardingFlow onComplete={handleOnboardingComplete} />
+        <ResetPasswordModal
+          isOpen={showPasswordReset}
+          onComplete={handlePasswordResetComplete}
+        />
+      </>
+    );
   }
 
   // Sign out — sync profile to cloud first, then clear local session data
@@ -161,9 +194,15 @@ export default function App() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen w-full bg-background flex items-center justify-center">
-        <AwakeLogo size="medium" />
-      </div>
+      <>
+        <div className="min-h-screen w-full bg-background flex items-center justify-center">
+          <AwakeLogo size="medium" />
+        </div>
+        <ResetPasswordModal
+          isOpen={showPasswordReset}
+          onComplete={handlePasswordResetComplete}
+        />
+      </>
     );
   }
 
@@ -187,11 +226,17 @@ export default function App() {
   // Show cockpit (consciousness control panel)
   if (viewMode === 'dashboard' && userData) {
     return (
-      <Cockpit 
-        userData={userData} 
-        onSignOut={handleSignOut}
-        onUpdateUserData={handleUpdateUserData}
-      />
+      <>
+        <Cockpit 
+          userData={userData} 
+          onSignOut={handleSignOut}
+          onUpdateUserData={handleUpdateUserData}
+        />
+        <ResetPasswordModal
+          isOpen={showPasswordReset}
+          onComplete={handlePasswordResetComplete}
+        />
+      </>
     );
   }
 
@@ -333,19 +378,6 @@ export default function App() {
               </Button>
             )}
 
-            {!user && userData?.identity?.name && (
-              <Button
-                onClick={() => setViewMode('dashboard')}
-                variant="outline"
-                className="px-8 py-6 rounded-full text-base cursor-pointer"
-                style={{
-                  borderColor: "rgba(99, 102, 241, 0.3)",
-                  background: "rgba(99, 102, 241, 0.05)"
-                }}
-              >
-                Continue as {userData.identity.name} (guest)
-              </Button>
-            )}
           </motion.div>
 
           {authNotice && (
@@ -386,7 +418,7 @@ export default function App() {
           transition={{ delay: 2 }}
           className="absolute bottom-8 text-xs"
         >
-          Awake v2.0 - Supabase Connected
+          Awake v2.0
         </motion.div>
       </div>
 
@@ -400,10 +432,10 @@ export default function App() {
           if (data) setUserData(data);
           setViewMode(view === 'landing' ? 'onboarding' : view);
         }}
-        onContinueAsGuest={() => {
-          setShowAuthModal(false);
-          setViewMode('onboarding');
-        }}
+      />
+      <ResetPasswordModal
+        isOpen={showPasswordReset}
+        onComplete={handlePasswordResetComplete}
       />
     </div>
   );
