@@ -11,17 +11,37 @@ import type { User } from '@supabase/supabase-js';
 
 type ViewMode = 'landing' | 'onboarding' | 'dashboard';
 
+/** After email confirmation or OAuth, Supabase redirects with tokens in the URL. */
+function consumeAuthCallbackNotice(): string | null {
+  if (typeof window === 'undefined') return null;
+  const { search, hash } = window.location;
+  const isCallback =
+    search.includes('code=') ||
+    hash.includes('access_token=') ||
+    hash.includes('type=signup') ||
+    hash.includes('type=email');
+  if (!isCallback) return null;
+  window.history.replaceState(null, '', window.location.pathname);
+  return 'You\'re signed in — your account is ready.';
+}
+
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('landing');
   const [userData, setUserData] = useState<UserData | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Initialize auth and load user data
   useEffect(() => {
     const init = async () => {
       try {
+        const callbackNotice = consumeAuthCallbackNotice();
+        if (callbackNotice) {
+          setAuthNotice(callbackNotice);
+        }
+
         // Check for authenticated user (with timeout)
         if (isSupabaseConfigured()) {
           const timeoutPromise = new Promise((_, reject) => 
@@ -305,6 +325,16 @@ export default function App() {
               </Button>
             )}
           </motion.div>
+
+          {authNotice && (
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 text-sm text-teal-300"
+            >
+              {authNotice}
+            </motion.p>
+          )}
 
           {/* Auth status */}
           {user && (

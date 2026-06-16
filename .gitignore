@@ -40,3 +40,6 @@ community-assets/
 # Keep design docs that we share
 docs/src/
 !docs/*.md
+
+# Private founder notes, sync prep, and logs (local only — never commit)
+private/

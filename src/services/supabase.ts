@@ -9,6 +9,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { UserData } from '../components/OnboardingFlow';
+import { getAuthRedirectUrl } from '../utils/authRedirect';
 import { applyCockpitSyncToLocalStorage, buildCockpitSyncSnapshot, notifyCockpitLocalChanged } from '../utils/cockpitCloudSync';
 import {
   appendMessageToActiveLoaChat,
@@ -21,8 +22,32 @@ import {
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-// Create Supabase client
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Create Supabase client (PKCE + detect email/OAuth callback tokens in URL)
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    flowType: 'pkce',
+    detectSessionInUrl: true,
+    persistSession: true,
+  },
+});
+
+export type SignUpOutcome = 'signed_in' | 'confirm_email' | 'already_registered';
+
+export function formatAuthError(err: unknown): string {
+  const message = err instanceof Error ? err.message : 'Something went wrong';
+
+  if (message.toLowerCase().includes('email not confirmed')) {
+    return 'Confirm your email first — check your inbox (and spam), or resend the link below.';
+  }
+  if (message.toLowerCase().includes('invalid login credentials')) {
+    return 'Wrong email or password. Try again or create an account.';
+  }
+  if (message.toLowerCase().includes('user already registered')) {
+    return 'This email already has an account. Sign in instead.';
+  }
+
+  return message;
+}
 
 // Types for our database
 export interface UserProfile {
@@ -50,13 +75,35 @@ export interface ChatMessage {
  */
 export const auth = {
   // Sign up with email
-  async signUp(email: string, password: string) {
+  async signUp(email: string, password: string): Promise<SignUpOutcome> {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: getAuthRedirectUrl(),
+      },
     });
     if (error) throw error;
-    return data;
+
+    // Supabase returns a user with no identities when email is already registered
+    if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
+      return 'already_registered';
+    }
+    if (data.session) {
+      return 'signed_in';
+    }
+    return 'confirm_email';
+  },
+
+  async resendConfirmation(email: string) {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: getAuthRedirectUrl(),
+      },
+    });
+    if (error) throw error;
   },
 
   // Sign in with email
@@ -74,7 +121,7 @@ export const auth = {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: getAuthRedirectUrl(),
       },
     });
     if (error) throw error;

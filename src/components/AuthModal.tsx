@@ -10,7 +10,7 @@ import { Mail, Loader2, Chrome, User, ArrowRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { auth, isSupabaseConfigured } from '../services/supabase';
+import { auth, formatAuthError, isSupabaseConfigured, type SignUpOutcome } from '../services/supabase';
 import { AwakeLogo } from './AwakeLogo';
 
 interface AuthModalProps {
@@ -30,27 +30,69 @@ export function AuthModal({ isOpen, onClose, onSuccess, onContinueAsGuest }: Aut
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const [pendingConfirmEmail, setPendingConfirmEmail] = useState<string | null>(null);
+
   if (!isOpen) return null;
+
+  const resetFormMessages = () => {
+    setError(null);
+    setSuccessMessage(null);
+    setPendingConfirmEmail(null);
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!pendingConfirmEmail) return;
+    setError(null);
+    setIsLoading(true);
+    try {
+      await auth.resendConfirmation(pendingConfirmEmail);
+      setSuccessMessage('Confirmation email sent — check your inbox and spam folder.');
+    } catch (err) {
+      setError(formatAuthError(err));
+    }
+    setIsLoading(false);
+  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccessMessage(null);
+    resetFormMessages();
     setIsLoading(true);
+
+    const normalizedEmail = email.trim();
 
     try {
       if (mode === 'signup') {
-        await auth.signUp(email, password);
-        // Supabase sends confirmation email by default
-        setSuccessMessage('Check your email for a confirmation link!');
+        const outcome: SignUpOutcome = await auth.signUp(normalizedEmail, password);
+
+        if (outcome === 'signed_in') {
+          setEmail('');
+          setPassword('');
+          onSuccess();
+          return;
+        }
+
+        if (outcome === 'already_registered') {
+          setError('This email already has an account. Sign in instead.');
+          setMode('signin');
+          return;
+        }
+
+        setPendingConfirmEmail(normalizedEmail);
+        setSuccessMessage(
+          'Check your email for a confirmation link. If nothing arrives in a few minutes, resend below or try signing in.'
+        );
         setEmail('');
         setPassword('');
       } else {
-        await auth.signIn(email, password);
+        await auth.signIn(normalizedEmail, password);
         onSuccess();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      const message = formatAuthError(err);
+      setError(message);
+      if (message.toLowerCase().includes('confirm your email')) {
+        setPendingConfirmEmail(normalizedEmail);
+      }
     }
 
     setIsLoading(false);
@@ -64,7 +106,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, onContinueAsGuest }: Aut
       await auth.signInWithGoogle();
       // Will redirect to Google, then back
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setError(formatAuthError(err));
       setIsLoading(false);
     }
   };
@@ -176,14 +218,34 @@ export function AuthModal({ isOpen, onClose, onSuccess, onContinueAsGuest }: Aut
             </div>
 
             {successMessage && (
-              <div className="p-3 rounded-lg border border-green-500/30 bg-green-500/10">
+              <div className="p-3 rounded-lg border border-green-500/30 bg-green-500/10 space-y-2">
                 <p className="text-sm text-green-400">{successMessage}</p>
+                {pendingConfirmEmail && (
+                  <button
+                    type="button"
+                    onClick={handleResendConfirmation}
+                    disabled={isLoading}
+                    className="text-sm text-green-300 hover:underline disabled:opacity-50"
+                  >
+                    Resend confirmation email
+                  </button>
+                )}
               </div>
             )}
 
             {error && (
-              <div className="p-3 rounded-lg border border-red-500/30 bg-red-500/10">
+              <div className="p-3 rounded-lg border border-red-500/30 bg-red-500/10 space-y-2">
                 <p className="text-sm text-red-400">{error}</p>
+                {pendingConfirmEmail && !successMessage && (
+                  <button
+                    type="button"
+                    onClick={handleResendConfirmation}
+                    disabled={isLoading}
+                    className="text-sm text-red-300 hover:underline disabled:opacity-50"
+                  >
+                    Resend confirmation email
+                  </button>
+                )}
               </div>
             )}
 
@@ -203,7 +265,10 @@ export function AuthModal({ isOpen, onClose, onSuccess, onContinueAsGuest }: Aut
               <>
                 Don't have an account?{' '}
                 <button
-                  onClick={() => setMode('signup')}
+                  onClick={() => {
+                    setMode('signup');
+                    resetFormMessages();
+                  }}
                   className="text-primary hover:underline"
                 >
                   Sign up
@@ -213,7 +278,10 @@ export function AuthModal({ isOpen, onClose, onSuccess, onContinueAsGuest }: Aut
               <>
                 Already have an account?{' '}
                 <button
-                  onClick={() => setMode('signin')}
+                  onClick={() => {
+                    setMode('signin');
+                    resetFormMessages();
+                  }}
                   className="text-primary hover:underline"
                 >
                   Sign in
