@@ -18,8 +18,8 @@ interface DashboardUnlockProps {
 export function DashboardUnlock({ userData, onEnter }: DashboardUnlockProps) {
   return (
     <div className="relative w-full h-full overflow-hidden flex items-center justify-center">
-      {/* Planet visualization background */}
-      <div className="absolute inset-0 pointer-events-none">
+      {/* Planet visualization background — must not intercept clicks */}
+      <div className="absolute inset-0 pointer-events-none z-0">
         {/* Planet core */}
         <motion.div
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
@@ -106,7 +106,7 @@ export function DashboardUnlock({ userData, onEnter }: DashboardUnlockProps) {
       </div>
 
       {/* Content overlay */}
-      <div className="relative z-10 text-center max-w-2xl px-8">
+      <div className="relative z-20 text-center max-w-2xl px-8 pointer-events-auto">
         {/* Loa companion */}
         <motion.div
           initial={{ opacity: 0, y: -30 }}
@@ -204,8 +204,9 @@ export function DashboardUnlock({ userData, onEnter }: DashboardUnlockProps) {
           transition={{ delay: 2.5, duration: 0.8 }}
         >
           <Button
+            type="button"
             onClick={onEnter}
-            className="px-12 py-7 rounded-full text-lg cursor-pointer"
+            className="relative z-20 px-12 py-7 rounded-full text-lg cursor-pointer text-white font-medium pointer-events-auto"
             style={{
               background: "linear-gradient(135deg, #6366f1, #14b8a6, #f59e0b)",
               boxShadow: "0 0 60px rgba(99, 102, 241, 0.6)"

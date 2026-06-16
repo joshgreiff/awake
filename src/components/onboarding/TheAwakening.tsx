@@ -113,7 +113,7 @@ export function TheAwakening({ onContinue }: TheAwakeningProps) {
             whileHover={{ scale: 1.05, boxShadow: "0 0 40px rgba(99, 102, 241, 0.6)" }}
             whileTap={{ scale: 0.95 }}
             onClick={onContinue}
-            className="px-10 py-4 rounded-full cursor-pointer"
+            className="px-10 py-4 rounded-full cursor-pointer text-white font-medium"
             style={{
               background: "linear-gradient(135deg, #6366f1, #14b8a6)",
               boxShadow: "0 0 30px rgba(99, 102, 241, 0.4)"
@@ -122,31 +122,31 @@ export function TheAwakening({ onContinue }: TheAwakeningProps) {
             Begin Your Awakening
           </motion.button>
         </motion.div>
-
-        {/* Ambient sound indicator */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0.3, 0.6, 0.3] }}
-          transition={{ delay: 3, duration: 2, repeat: Infinity }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 text-xs opacity-50"
-        >
-          <div className="flex items-center gap-2">
-            {[...Array(3)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="w-1 bg-electric-indigo rounded-full"
-                animate={{ height: [8, 16, 8] }}
-                transition={{
-                  duration: 0.8,
-                  repeat: Infinity,
-                  delay: i * 0.2
-                }}
-              />
-            ))}
-            <span className="ml-2">ambient resonance active</span>
-          </div>
-        </motion.div>
       </div>
+
+      {/* Ambient sound indicator — pinned to screen bottom, not over the CTA */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0.3, 0.6, 0.3] }}
+        transition={{ delay: 3, duration: 2, repeat: Infinity }}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 text-xs opacity-50 pointer-events-none"
+      >
+        <div className="flex items-center gap-2">
+          {[...Array(3)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="w-1 bg-electric-indigo rounded-full"
+              animate={{ height: [8, 16, 8] }}
+              transition={{
+                duration: 0.8,
+                repeat: Infinity,
+                delay: i * 0.2
+              }}
+            />
+          ))}
+          <span className="ml-2">ambient resonance active</span>
+        </div>
+      </motion.div>
     </div>
   );
 }

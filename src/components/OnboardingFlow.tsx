@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TheAwakening } from './onboarding/TheAwakening';
 import { NamesOfBecoming } from './onboarding/NamesOfBecoming';
@@ -62,6 +62,8 @@ const STORAGE_KEY = 'awake_onboarding_progress';
 export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const [stage, setStage] = useState<Stage>('awakening');
   const [userData, setUserData] = useState<UserData>({});
+  const userDataRef = useRef(userData);
+  userDataRef.current = userData;
 
   // Load progress from localStorage
   useEffect(() => {
@@ -90,14 +92,12 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     setUserData((prev) => ({ ...prev, [key]: data }));
   };
 
-  const handleComplete = () => {
-    // Save final user data
-    localStorage.setItem('awake_user_data', JSON.stringify(userData));
-    // Clear onboarding progress
+  const handleComplete = useCallback(() => {
+    const finalData = userDataRef.current;
+    localStorage.setItem('awake_user_data', JSON.stringify(finalData));
     localStorage.removeItem(STORAGE_KEY);
-    // Notify parent
-    onComplete(userData);
-  };
+    onComplete(finalData);
+  }, [onComplete]);
 
   const stages: { id: Stage; component: React.ReactNode }[] = [
     {

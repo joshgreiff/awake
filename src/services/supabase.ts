@@ -165,7 +165,10 @@ export const userData = {
     // Always save to localStorage first (guaranteed to work)
     localStorage.setItem('awake_user_data', JSON.stringify(payload));
     
-    const user = await auth.getUser();
+    const user = await Promise.race([
+      auth.getUser(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+    ]);
     if (!user) {
       // Not logged in - localStorage only
       return;

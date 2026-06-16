@@ -121,17 +121,13 @@ export default function App() {
     init();
   }, []);
 
-  // Handle onboarding completion
-  const handleOnboardingComplete = async (data: UserData) => {
-    try {
-      setUserData(data);
-      // Save to Supabase (or localStorage if not logged in)
-      await userDataService.save(data);
-    } catch (err) {
-      console.error('Error saving user data:', err);
-      // Data is still saved to localStorage, continue anyway
-    }
+  // Handle onboarding completion — navigate immediately; cloud save in background
+  const handleOnboardingComplete = (data: UserData) => {
+    setUserData(data);
     setViewMode('dashboard');
+    void userDataService.save(data).catch((err) => {
+      console.error('Error saving user data:', err);
+    });
   };
 
   // Show onboarding flow
