@@ -10,6 +10,8 @@ export function clearLocalAwakeData(options?: { keepAiConfig?: boolean }) {
     if (!key) continue;
     if (key.startsWith('awake_')) {
       if (keepAiConfig && key === 'awake_ai_config') continue;
+      // Keep in-progress setup when signing out (only cleared on completion)
+      if (key === 'awake_onboarding_progress') continue;
       keysToRemove.push(key);
     }
   }

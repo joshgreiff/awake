@@ -7,6 +7,10 @@ import { Cockpit } from './components/Cockpit';
 import { AuthModal } from './components/AuthModal';
 import { auth, userData as userDataService, isSupabaseConfigured } from './services/supabase';
 import { clearLocalAwakeData } from './utils/clearLocalData';
+import {
+  isOnboardingComplete,
+  shouldResumeOnboarding,
+} from './utils/onboardingProgress';
 import type { User } from '@supabase/supabase-js';
 
 type ViewMode = 'landing' | 'onboarding' | 'dashboard';
@@ -71,6 +75,12 @@ export default function App() {
             }
             
             if (event === 'SIGNED_IN' && session?.user) {
+              const resume = shouldResumeOnboarding(null);
+              if (resume) {
+                setViewMode('onboarding');
+                return;
+              }
+
               // Sync local data to cloud on first sign in
               await userDataService.syncLocalToCloud();
               // Reload user data from cloud
@@ -86,30 +96,31 @@ export default function App() {
         }
 
         // Load user data (try Supabase first, fall back to localStorage)
-        let data = null;
+        let data: UserData | null = null;
         try {
           data = await Promise.race([
             userDataService.load(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+            new Promise<UserData | null>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
           ]) as UserData | null;
         } catch (e) {
-          // Fall back to localStorage directly
           const local = localStorage.getItem('awake_user_data');
           data = local ? JSON.parse(local) : null;
         }
-        
-        if (data) {
+
+        const resumeOnboarding = shouldResumeOnboarding(data);
+
+        if (resumeOnboarding) {
+          setViewMode('onboarding');
+          if (resumeOnboarding.userData && Object.keys(resumeOnboarding.userData).length > 0) {
+            setUserData(resumeOnboarding.userData);
+          }
+        } else if (data) {
           setUserData(data);
-          // Only auto-open dashboard when signed in (not after sign-out / guest landing)
-          if (data.identity?.name && currentUser) {
+          if (isOnboardingComplete(data) && currentUser) {
+            setViewMode('dashboard');
+          } else if (isOnboardingComplete(data)) {
             setViewMode('dashboard');
           }
-        }
-
-        // Check for in-progress onboarding
-        const onboardingProgress = localStorage.getItem('awake_onboarding_progress');
-        if (onboardingProgress && !data) {
-          setViewMode('onboarding');
         }
       } catch (err) {
         console.error('Init error:', err);

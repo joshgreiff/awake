@@ -9,6 +9,11 @@ import { DashboardUnlock } from './onboarding/DashboardUnlock';
 import type { CockpitSyncState } from '../types/cockpitSync';
 import type { Archetype } from '../types/archetype';
 import type { DomainId, DomainState } from '../types/domains';
+import {
+  clearOnboardingProgress,
+  readOnboardingProgress,
+  writeOnboardingProgress,
+} from '../utils/onboardingProgress';
 
 interface OnboardingFlowProps {
   onComplete: (userData: UserData) => void;
@@ -57,35 +62,24 @@ type Stage =
   | 'intention'
   | 'unlock';
 
-const STORAGE_KEY = 'awake_onboarding_progress';
+function getInitialOnboardingState(): { stage: Stage; userData: UserData } {
+  const saved = readOnboardingProgress();
+  if (saved) {
+    return { stage: saved.stage as Stage, userData: saved.userData };
+  }
+  return { stage: 'awakening', userData: {} };
+}
 
 export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
-  const [stage, setStage] = useState<Stage>('awakening');
-  const [userData, setUserData] = useState<UserData>({});
+  const initial = getInitialOnboardingState();
+  const [stage, setStage] = useState<Stage>(initial.stage);
+  const [userData, setUserData] = useState<UserData>(initial.userData);
   const userDataRef = useRef(userData);
   userDataRef.current = userData;
 
-  // Load progress from localStorage
+  // Persist after every step (including awakening)
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const { stage: savedStage, userData: savedData } = JSON.parse(saved);
-        if (savedStage && savedData) {
-          setStage(savedStage);
-          setUserData(savedData);
-        }
-      } catch (e) {
-        console.error('Failed to restore onboarding progress:', e);
-      }
-    }
-  }, []);
-
-  // Save progress to localStorage
-  useEffect(() => {
-    if (stage !== 'awakening' || Object.keys(userData).length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ stage, userData }));
-    }
+    writeOnboardingProgress({ stage, userData });
   }, [stage, userData]);
 
   const updateUserData = (key: keyof UserData, data: UserData[keyof UserData]) => {
@@ -95,7 +89,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const handleComplete = useCallback(() => {
     const finalData = userDataRef.current;
     localStorage.setItem('awake_user_data', JSON.stringify(finalData));
-    localStorage.removeItem(STORAGE_KEY);
+    clearOnboardingProgress();
     onComplete(finalData);
   }, [onComplete]);
 
