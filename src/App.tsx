@@ -6,7 +6,7 @@ import { OnboardingFlow, type UserData } from './components/OnboardingFlow';
 import { Cockpit } from './components/Cockpit';
 import { AuthModal } from './components/AuthModal';
 import { auth, userData as userDataService, isSupabaseConfigured } from './services/supabase';
-import { LOA_CHATS_STORAGE_KEY } from './utils/loaChatStorage';
+import { clearLocalAwakeData } from './utils/clearLocalData';
 import type { User } from '@supabase/supabase-js';
 
 type ViewMode = 'landing' | 'onboarding' | 'dashboard';
@@ -43,16 +43,17 @@ export default function App() {
         }
 
         // Check for authenticated user (with timeout)
+        let currentUser: User | null = null;
         if (isSupabaseConfigured()) {
           const timeoutPromise = new Promise((_, reject) => 
             setTimeout(() => reject(new Error('timeout')), 5000)
           );
           
           try {
-            const currentUser = await Promise.race([
+            currentUser = await Promise.race([
               auth.getUser(),
               timeoutPromise
-            ]) as any;
+            ]) as User | null;
             setUser(currentUser);
           } catch (e) {
             console.log('Auth check timed out or failed, continuing without auth');
@@ -61,6 +62,13 @@ export default function App() {
           // Listen for auth changes
           auth.onAuthStateChange(async (event, session) => {
             setUser(session?.user ?? null);
+
+            if (event === 'SIGNED_OUT') {
+              clearLocalAwakeData();
+              setUserData(null);
+              setViewMode('landing');
+              return;
+            }
             
             if (event === 'SIGNED_IN' && session?.user) {
               // Sync local data to cloud on first sign in
@@ -92,7 +100,8 @@ export default function App() {
         
         if (data) {
           setUserData(data);
-          if (data.identity?.name) {
+          // Only auto-open dashboard when signed in (not after sign-out / guest landing)
+          if (data.identity?.name && currentUser) {
             setViewMode('dashboard');
           }
         }
@@ -130,20 +139,19 @@ export default function App() {
     return <OnboardingFlow onComplete={handleOnboardingComplete} />;
   }
 
-  // Reset user data and start fresh
-  const handleReset = async () => {
-    localStorage.removeItem('awake_user_data');
-    localStorage.removeItem('awake_onboarding_progress');
-    localStorage.removeItem(LOA_CHATS_STORAGE_KEY);
-    
-    // Sign out if logged in
-    if (user) {
-      await auth.signOut();
-      setUser(null);
-    }
-    
+  // Sign out — end session; local journey data cleared; cloud profile kept for next login
+  const handleSignOut = async () => {
+    clearLocalAwakeData();
     setUserData(null);
     setViewMode('landing');
+
+    try {
+      await auth.signOut();
+    } catch (err) {
+      console.error('Sign out error:', err);
+    }
+
+    setUser(null);
   };
 
   // Loading state
@@ -177,7 +185,7 @@ export default function App() {
     return (
       <Cockpit 
         userData={userData} 
-        onReset={handleReset}
+        onSignOut={handleSignOut}
         onUpdateUserData={handleUpdateUserData}
       />
     );
@@ -311,7 +319,28 @@ export default function App() {
               {user ? (userData?.identity?.name ? 'Go to Dashboard' : 'Continue Setup') : 'Begin Your Awakening'}
             </Button>
             
-            {userData?.identity?.name && (
+            {user && userData?.identity?.name && (
+              <Button
+                onClick={async () => {
+                  await userDataService.syncLocalToCloud();
+                  const data = await userDataService.load();
+                  if (data?.identity?.name) {
+                    setUserData(data);
+                    setViewMode('dashboard');
+                  }
+                }}
+                variant="outline"
+                className="px-8 py-6 rounded-full text-base cursor-pointer"
+                style={{
+                  borderColor: "rgba(99, 102, 241, 0.3)",
+                  background: "rgba(99, 102, 241, 0.05)"
+                }}
+              >
+                Welcome back, {userData.identity.name}
+              </Button>
+            )}
+
+            {!user && userData?.identity?.name && (
               <Button
                 onClick={() => setViewMode('dashboard')}
                 variant="outline"
@@ -321,7 +350,7 @@ export default function App() {
                   background: "rgba(99, 102, 241, 0.05)"
                 }}
               >
-                Welcome back, {userData.identity.name}
+                Continue as {userData.identity.name} (guest)
               </Button>
             )}
           </motion.div>
@@ -345,6 +374,14 @@ export default function App() {
               className="mt-4 text-xs"
             >
               Signed in as {user.email}
+              {' · '}
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="underline hover:opacity-100 opacity-80"
+              >
+                Sign out
+              </button>
             </motion.p>
           )}
         </div>

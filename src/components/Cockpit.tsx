@@ -39,7 +39,7 @@ import { DOMAINS, type DomainId, calculateOverallAlignment } from '../types/doma
 
 interface CockpitProps {
   userData: UserData;
-  onReset: () => void;
+  onSignOut: () => void;
   onUpdateUserData?: (data: Partial<UserData>) => void;
 }
 
@@ -79,7 +79,7 @@ const WIDGET_TYPES = [
   { type: 'bin', name: 'Release Bin', icon: Trash2 },
 ] as const;
 
-export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
+export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps) {
   const [sliders, setSliders] = useState<StateSlider[]>(() => {
     const saved = localStorage.getItem('awake_cockpit_sliders');
     if (saved) {
@@ -266,9 +266,9 @@ export function Cockpit({ userData, onReset, onUpdateUserData }: CockpitProps) {
             <Settings className="w-5 h-5 opacity-50" />
           </button>
           <button 
-            onClick={onReset}
+            onClick={onSignOut}
             className="p-2 rounded-lg hover:bg-white/5 transition-colors"
-            title="Log out"
+            title="Sign out"
           >
             <LogOut className="w-5 h-5 opacity-50" />
           </button>

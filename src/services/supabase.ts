@@ -128,9 +128,9 @@ export const auth = {
     return data;
   },
 
-  // Sign out
+  // Sign out (ends session on this device and other tabs when possible)
   async signOut() {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: 'global' });
     if (error) throw error;
   },
 
