@@ -33,6 +33,7 @@ import {
   setDailyChallenge,
   unlogShowUpToday,
 } from '../utils/dailyChallenge';
+import { toggleShowUpToday } from '../utils/cockpitActions';
 import {
   buildCockpitSyncSnapshot,
   COCKPIT_SYNC_EVENT,
@@ -306,10 +307,19 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
         id: 'showup',
         label: hasChallenge ? 'Show up' : 'Set challenge',
         done: hasChallenge && hasShownUpToday(),
+        tappable: hasChallenge,
       },
       { id: 'move', label: 'Move', done: hasMovedToday() },
     ];
   }, [todayRitual, sessionTick]);
+
+  const handleSessionShowUp = () => {
+    if (!readDailyChallengeState().challenge) return;
+    const logged = toggleShowUpToday();
+    if (logged) triggerSmallCelebration();
+    notifyCockpitLocalChanged();
+    setSessionTick((n) => n + 1);
+  };
 
   const sessionComplete = sessionSteps.every((s) => s.done);
 
@@ -437,21 +447,27 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
             )}
           </div>
           <div className="flex gap-2">
-            {sessionSteps.map((step) => (
-              <div
-                key={step.id}
-                className={`flex flex-1 flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center ${
-                  step.done ? 'bg-emerald-500/10' : 'bg-white/[0.03]'
-                }`}
-              >
-                {step.done ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                ) : (
-                  <Circle className="h-4 w-4 opacity-30" />
-                )}
-                <span className="text-[10px] leading-tight opacity-60">{step.label}</span>
-              </div>
-            ))}
+            {sessionSteps.map((step) => {
+              const StepEl = step.tappable ? 'button' : 'div';
+              return (
+                <StepEl
+                  key={step.id}
+                  type={step.tappable ? 'button' : undefined}
+                  onClick={step.tappable ? handleSessionShowUp : undefined}
+                  title={step.tappable ? (step.done ? 'Undo show-up' : 'Log show-up') : undefined}
+                  className={`flex flex-1 flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center transition-colors ${
+                    step.done ? 'bg-emerald-500/10' : 'bg-white/[0.03]'
+                  } ${step.tappable ? 'hover:bg-white/[0.06] cursor-pointer' : ''}`}
+                >
+                  {step.done ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                  ) : (
+                    <Circle className="h-4 w-4 opacity-30" />
+                  )}
+                  <span className="text-[10px] leading-tight opacity-60">{step.label}</span>
+                </StepEl>
+              );
+            })}
           </div>
           <p className="mt-3 text-[11px] leading-relaxed opacity-35">
             {sessionComplete
@@ -1423,12 +1439,18 @@ function DailyChallengeWidget() {
   const [state, setState] = useState(readDailyChallengeState);
   const [titleDraft, setTitleDraft] = useState('');
   const [minimumDraft, setMinimumDraft] = useState('Just show up — that counts.');
-  const [showedToday, setShowedToday] = useState(hasShownUpToday);
+  const [showedToday, setShowedToday] = useState(() => hasShownUpToday());
 
   const refresh = () => {
     setState(readDailyChallengeState());
     setShowedToday(hasShownUpToday());
   };
+
+  useEffect(() => {
+    const onSync = () => refresh();
+    window.addEventListener(COCKPIT_SYNC_EVENT, onSync);
+    return () => window.removeEventListener(COCKPIT_SYNC_EVENT, onSync);
+  }, []);
 
   const streak = computeChallengeStreak();
 

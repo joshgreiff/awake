@@ -63,7 +63,8 @@ export function logShowUpToday(note?: string): boolean {
   const state = readDailyChallengeState();
   if (!state.challenge) return false;
   const today = localDateKey();
-  state.logs[today] = note?.trim() || undefined;
+  // Use '' not undefined — JSON.stringify omits undefined values, so the log never persisted.
+  state.logs[today] = note?.trim() ?? '';
   writeDailyChallengeState(state);
   return true;
 }
@@ -77,7 +78,7 @@ export function unlogShowUpToday(): void {
 
 export function hasShownUpToday(): boolean {
   const state = readDailyChallengeState();
-  return !!state.logs[localDateKey()];
+  return localDateKey() in state.logs;
 }
 
 export function computeChallengeStreak(): number {

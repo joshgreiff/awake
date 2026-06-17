@@ -12,6 +12,7 @@ import type { UserData } from '../components/OnboardingFlow';
 import { isOnboardingComplete } from '../utils/onboardingProgress';
 import { normalizeUserData, type SaveResult } from '../utils/userDataNormalize';
 import { getAuthRedirectUrl } from '../utils/authRedirect';
+import { markPasswordResetPending } from '../utils/authRecovery';
 import { applyCockpitSyncToLocalStorage, buildCockpitSyncSnapshot, notifyCockpitLocalChanged } from '../utils/cockpitCloudSync';
 import {
   appendMessageToActiveLoaChat,
@@ -54,14 +55,11 @@ export function formatAuthError(err: unknown): string {
   return message;
 }
 
-export function isPasswordRecoveryUrl(): boolean {
-  if (typeof window === 'undefined') return false;
-  const { search, hash } = window.location;
-  return (
-    hash.includes('type=recovery') ||
-    search.includes('type=recovery')
-  );
-}
+// Re-export for callers that import from supabase
+export {
+  isPasswordRecoveryUrl,
+  clearPasswordResetPending,
+} from '../utils/authRecovery';
 
 // Types for our database
 export interface UserProfile {
@@ -131,6 +129,7 @@ export const auth = {
   },
 
   async requestPasswordReset(email: string) {
+    markPasswordResetPending();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: getAuthRedirectUrl(),
     });

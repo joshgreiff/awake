@@ -24,6 +24,9 @@ import {
   type LoaChatsState,
   type LoaChatMessageRecord,
 } from '../utils/loaChatStorage';
+import { tryParseShowUpLog } from '../utils/cockpitActions';
+import { notifyCockpitLocalChanged } from '../utils/cockpitCloudSync';
+import { triggerSmallCelebration } from '../utils/confetti';
 
 interface LoaChatProps {
   userData: UserData;
@@ -177,6 +180,66 @@ export function LoaChat({ userData, isOpen, onClose, onOpenSettings }: LoaChatPr
     );
     setInput('');
     setError(null);
+
+    const showUp = tryParseShowUpLog(userMessage.content);
+    if (showUp.action === 'log') {
+      notifyCockpitLocalChanged();
+      triggerSmallCelebration();
+      const assistantMessage: LoaChatMessageRecord = {
+        id: `${Date.now() + 1}`,
+        role: 'assistant',
+        content: `Logged show-up for **${showUp.challengeTitle}**. Minimum bar counts — you're in the container.`,
+        timestamp: new Date().toISOString(),
+      };
+      setChats((prev) =>
+        trimConversations(
+          patchActiveConversation(prev, (c) => ({
+            ...c,
+            messages: [...c.messages, assistantMessage],
+            updatedAt: assistantMessage.timestamp,
+          }))
+        )
+      );
+      return;
+    }
+    if (showUp.action === 'unlog') {
+      notifyCockpitLocalChanged();
+      const assistantMessage: LoaChatMessageRecord = {
+        id: `${Date.now() + 1}`,
+        role: 'assistant',
+        content: `Undid today's show-up for **${showUp.challengeTitle}**.`,
+        timestamp: new Date().toISOString(),
+      };
+      setChats((prev) =>
+        trimConversations(
+          patchActiveConversation(prev, (c) => ({
+            ...c,
+            messages: [...c.messages, assistantMessage],
+            updatedAt: assistantMessage.timestamp,
+          }))
+        )
+      );
+      return;
+    }
+    if (showUp.challengeTitle && showUp.action === 'none' && /\bshow[\s-]?up\b/i.test(userMessage.content)) {
+      const assistantMessage: LoaChatMessageRecord = {
+        id: `${Date.now() + 1}`,
+        role: 'assistant',
+        content: `You already logged show-up for **${showUp.challengeTitle}** today.`,
+        timestamp: new Date().toISOString(),
+      };
+      setChats((prev) =>
+        trimConversations(
+          patchActiveConversation(prev, (c) => ({
+            ...c,
+            messages: [...c.messages, assistantMessage],
+            updatedAt: assistantMessage.timestamp,
+          }))
+        )
+      );
+      return;
+    }
+
     setIsLoading(true);
 
     try {

@@ -6,7 +6,15 @@ import { OnboardingFlow, type UserData } from './components/OnboardingFlow';
 import { Cockpit } from './components/Cockpit';
 import { AuthModal } from './components/AuthModal';
 import { ResetPasswordModal } from './components/ResetPasswordModal';
-import { auth, userData as userDataService, isSupabaseConfigured, isPasswordRecoveryUrl, supabase } from './services/supabase';
+import { auth, userData as userDataService, isSupabaseConfigured, supabase } from './services/supabase';
+import {
+  clearAuthCallbackFromUrl,
+  clearPasswordResetPending,
+  hasAuthCallbackInUrl,
+  isPasswordResetPending,
+  shouldOpenPasswordReset,
+  waitForPasswordRecoveryEvent,
+} from './utils/authRecovery';
 import { clearLocalAwakeData } from './utils/clearLocalData';
 import {
   isOnboardingComplete,
@@ -19,20 +27,20 @@ import type { User } from '@supabase/supabase-js';
 
 type ViewMode = 'landing' | 'onboarding' | 'dashboard';
 
-/** After email confirmation or OAuth, Supabase redirects with tokens in the URL. */
+/** After email confirmation — not used for ?code= (PKCE); auth events handle that. */
 function consumeAuthCallbackNotice(): string | null {
   if (typeof window === 'undefined') return null;
   const { search, hash } = window.location;
-  if (hash.includes('type=recovery') || search.includes('type=recovery')) {
-    return null;
-  }
+  if (search.includes('code=')) return null;
+  if (isPasswordResetPending()) return null;
+  if (hash.includes('type=recovery') || search.includes('type=recovery')) return null;
+
   const isCallback =
-    search.includes('code=') ||
     hash.includes('access_token=') ||
     hash.includes('type=signup') ||
     hash.includes('type=email');
   if (!isCallback) return null;
-  window.history.replaceState(null, '', window.location.pathname);
+  clearAuthCallbackFromUrl();
   return 'You\'re signed in — your account is ready.';
 }
 
@@ -90,9 +98,7 @@ export default function App() {
         }
 
         if (isSupabaseConfigured()) {
-          const session = await auth.getSession();
-          const currentUser = session?.user ?? null;
-          setUser(currentUser);
+          const awaitingCallback = hasAuthCallbackInUrl();
 
           const {
             data: { subscription },
@@ -102,26 +108,58 @@ export default function App() {
               if (event === 'SIGNED_OUT') {
                 clearLocalAwakeData();
                 clearOnboardingProgress();
+                clearPasswordResetPending();
                 setUserData(null);
                 setViewMode('landing');
+                setShowPasswordReset(false);
                 return;
               }
 
-              if (event === 'PASSWORD_RECOVERY') {
+              if (shouldOpenPasswordReset(event) && nextSession?.user) {
                 setShowPasswordReset(true);
+                clearAuthCallbackFromUrl();
                 return;
               }
 
-              // Cold start is handled in init(); only react to fresh sign-ins here
-              if (event === 'SIGNED_IN' && nextSession?.user && !isPasswordRecoveryUrl()) {
+              if (event === 'SIGNED_IN' && nextSession?.user && !awaitingCallback) {
                 await routeSignedIn();
               }
             });
           authSubscription = subscription;
 
-          if (currentUser) {
-            if (isPasswordRecoveryUrl()) {
+          if (awaitingCallback) {
+            const recoveryWait = waitForPasswordRecoveryEvent(supabase);
+            const session = await auth.getSession();
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
+
+            const isRecovery =
+              (await recoveryWait) ||
+              isPasswordResetPending() ||
+              shouldOpenPasswordReset('PASSWORD_RECOVERY');
+
+            if (currentUser && isRecovery) {
               setShowPasswordReset(true);
+              clearAuthCallbackFromUrl();
+            } else if (currentUser) {
+              clearAuthCallbackFromUrl();
+              setAuthNotice('You\'re signed in — your account is ready.');
+              await routeSignedIn();
+            } else {
+              routeGuest();
+            }
+            setIsLoading(false);
+            return;
+          }
+
+          const session = await auth.getSession();
+          const currentUser = session?.user ?? null;
+          setUser(currentUser);
+
+          if (currentUser) {
+            if (isPasswordResetPending()) {
+              setShowPasswordReset(true);
+              clearAuthCallbackFromUrl();
             } else {
               await routeSignedIn();
             }
@@ -146,7 +184,9 @@ export default function App() {
   }, []);
 
   const handlePasswordResetComplete = async () => {
+    clearPasswordResetPending();
     setShowPasswordReset(false);
+    clearAuthCallbackFromUrl();
     setAuthNotice('Password updated — you\'re signed in.');
     const boot = await bootstrapUserSession();
     if (boot.data) setUserData(boot.data);
@@ -418,7 +458,7 @@ export default function App() {
           transition={{ delay: 2 }}
           className="absolute bottom-8 text-xs"
         >
-          Awake v2.0
+          Awake · Beta
         </motion.div>
       </div>
 

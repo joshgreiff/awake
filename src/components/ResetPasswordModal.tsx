@@ -9,6 +9,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { auth, formatAuthError } from '../services/supabase';
+import { clearAuthCallbackFromUrl, clearPasswordResetPending } from '../utils/authRecovery';
 import { AwakeLogo } from './AwakeLogo';
 
 interface ResetPasswordModalProps {
@@ -40,7 +41,8 @@ export function ResetPasswordModal({ isOpen, onComplete }: ResetPasswordModalPro
     setIsLoading(true);
     try {
       await auth.updatePassword(password);
-      window.history.replaceState(null, '', window.location.pathname);
+      clearPasswordResetPending();
+      clearAuthCallbackFromUrl();
       setPassword('');
       setConfirm('');
       onComplete();
