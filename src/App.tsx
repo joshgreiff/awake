@@ -10,10 +10,10 @@ import { auth, userData as userDataService, isSupabaseConfigured, supabase } fro
 import {
   clearAuthCallbackFromUrl,
   clearPasswordResetPending,
+  getSessionWithTimeout,
   hasAuthCallbackInUrl,
   isPasswordResetPending,
   shouldOpenPasswordReset,
-  waitForPasswordRecoveryEvent,
 } from './utils/authRecovery';
 import { clearLocalAwakeData } from './utils/clearLocalData';
 import {
@@ -91,6 +91,8 @@ export default function App() {
     };
 
     const init = async () => {
+      let initComplete = false;
+
       try {
         const callbackNotice = consumeAuthCallbackNotice();
         if (callbackNotice) {
@@ -98,11 +100,9 @@ export default function App() {
         }
 
         if (isSupabaseConfigured()) {
-          const awaitingCallback = hasAuthCallbackInUrl();
-
           const {
             data: { subscription },
-          } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+          } = supabase.auth.onAuthStateChange((event, nextSession) => {
               setUser(nextSession?.user ?? null);
 
               if (event === 'SIGNED_OUT') {
@@ -121,59 +121,59 @@ export default function App() {
                 return;
               }
 
-              if (event === 'SIGNED_IN' && nextSession?.user && !awaitingCallback) {
-                await routeSignedIn();
+              if (isPasswordResetPending() && nextSession?.user) {
+                setShowPasswordReset(true);
+                return;
+              }
+
+              // Only route after cold-start init — avoids getSession deadlock during boot
+              if (initComplete && event === 'SIGNED_IN' && nextSession?.user) {
+                void routeSignedIn();
               }
             });
           authSubscription = subscription;
 
-          if (awaitingCallback) {
-            const recoveryWait = waitForPasswordRecoveryEvent(supabase);
-            const session = await auth.getSession();
-            const currentUser = session?.user ?? null;
-            setUser(currentUser);
-
-            const isRecovery =
-              (await recoveryWait) ||
-              isPasswordResetPending() ||
-              shouldOpenPasswordReset('PASSWORD_RECOVERY');
-
-            if (currentUser && isRecovery) {
-              setShowPasswordReset(true);
-              clearAuthCallbackFromUrl();
-            } else if (currentUser) {
-              clearAuthCallbackFromUrl();
-              setAuthNotice('You\'re signed in — your account is ready.');
-              await routeSignedIn();
-            } else {
-              routeGuest();
-            }
+          let session;
+          try {
+            ({ data: { session } } = await getSessionWithTimeout(supabase));
+          } catch (err) {
+            console.warn('Auth session init failed:', err);
+            clearAuthCallbackFromUrl();
+            clearPasswordResetPending();
+            routeGuest();
             setIsLoading(false);
+            initComplete = true;
             return;
           }
 
-          const session = await auth.getSession();
           const currentUser = session?.user ?? null;
           setUser(currentUser);
+          const hadCallback = hasAuthCallbackInUrl();
+
+          if (hadCallback) {
+            clearAuthCallbackFromUrl();
+          }
 
           if (currentUser) {
+            await routeSignedIn();
             if (isPasswordResetPending()) {
               setShowPasswordReset(true);
-              clearAuthCallbackFromUrl();
-            } else {
-              await routeSignedIn();
+            } else if (hadCallback) {
+              setAuthNotice('You\'re signed in — your account is ready.');
             }
-            setIsLoading(false);
-            return;
+          } else {
+            routeGuest();
           }
+        } else {
+          routeGuest();
         }
-
-        routeGuest();
       } catch (err) {
         console.error('Init error:', err);
+        routeGuest();
       }
 
       setIsLoading(false);
+      initComplete = true;
     };
 
     void init();

@@ -52,33 +52,20 @@ export function clearAuthCallbackFromUrl(): void {
 export function shouldOpenPasswordReset(event: AuthChangeEvent): boolean {
   if (event === 'PASSWORD_RECOVERY') return true;
   if (isPasswordRecoveryUrl()) return true;
-  if (isPasswordResetPending()) return true;
   return false;
 }
 
-/** After PKCE code exchange, PASSWORD_RECOVERY may fire slightly after INITIAL_SESSION. */
-export function waitForPasswordRecoveryEvent(
-  client: SupabaseClient,
-  timeoutMs = 2000,
-): Promise<boolean> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const {
-      data: { subscription },
-    } = client.auth.onAuthStateChange((event) => {
-      if (settled) return;
-      if (event === 'PASSWORD_RECOVERY') {
-        settled = true;
-        subscription.unsubscribe();
-        resolve(true);
-      }
-    });
+const SESSION_INIT_TIMEOUT_MS = 10_000;
 
-    window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      subscription.unsubscribe();
-      resolve(false);
-    }, timeoutMs);
-  });
+/** Avoid hanging forever on stale PKCE codes or auth deadlocks. */
+export async function getSessionWithTimeout(
+  client: SupabaseClient,
+  timeoutMs = SESSION_INIT_TIMEOUT_MS,
+) {
+  return Promise.race([
+    client.auth.getSession(),
+    new Promise<never>((_, reject) => {
+      window.setTimeout(() => reject(new Error('Auth session timed out')), timeoutMs);
+    }),
+  ]);
 }
