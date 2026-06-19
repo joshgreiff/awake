@@ -25,14 +25,16 @@ import {
 } from '../utils/artifacts';
 import { computeAwakeDayStreak, collectActiveDays } from '../utils/streak';
 import {
-  clearDailyChallenge,
   computeChallengeStreak,
+  createChallenge,
+  deleteChallenge,
+  getChallenge,
   hasShownUpToday,
+  hasShownUpToAllChallengesToday,
   logShowUpToday,
-  readDailyChallengeState,
-  setDailyChallenge,
+  readDailyChallenges,
   unlogShowUpToday,
-  updateDailyChallenge,
+  updateChallenge,
 } from '../utils/dailyChallenge';
 import { toggleShowUpToday } from '../utils/cockpitActions';
 import {
@@ -80,6 +82,8 @@ interface Widget {
   id: string;
   type: WidgetType;
   position: number;
+  /** Links a daily-challenge widget to its own challenge record */
+  challengeId?: string;
 }
 
 const DEPRECATED_WIDGET_TYPES = new Set([
@@ -119,9 +123,49 @@ function sanitizeWidgets(raw: unknown): Widget[] {
         !DEPRECATED_WIDGET_TYPES.has((w as Widget).type) &&
         ALLOWED_WIDGET_TYPES.has((w as Widget).type as WidgetType)
     )
-    .map((w, i) => ({ ...w, position: i }));
+    .map((w, i) => ({
+      ...w,
+      position: i,
+      challengeId: typeof w.challengeId === 'string' ? w.challengeId : undefined,
+    }));
 
   return filtered.length > 0 ? filtered : DEFAULT_WIDGETS;
+}
+
+/** Attach unbound challenge widgets to orphan challenges after storage migration. */
+function bindOrphanChallenges(widgets: Widget[]): Widget[] {
+  const challenges = readDailyChallenges();
+  const boundIds = new Set(
+    widgets.map((w) => w.challengeId).filter((id): id is string => !!id)
+  );
+  const orphans = challenges.filter((c) => !boundIds.has(c.id));
+  if (orphans.length === 0) return widgets;
+
+  let orphanIdx = 0;
+  return widgets.map((w) => {
+    if (w.type !== 'daily-challenge' || w.challengeId || orphanIdx >= orphans.length) {
+      return w;
+    }
+    const next = { ...w, challengeId: orphans[orphanIdx].id };
+    orphanIdx += 1;
+    return next;
+  });
+}
+
+/** Each widget binds to at most one challenge; duplicates are cleared for re-setup. */
+function dedupeChallengeBindings(widgets: Widget[]): Widget[] {
+  const seen = new Set<string>();
+  return widgets.map((w) => {
+    if (w.type !== 'daily-challenge' || !w.challengeId) return w;
+    if (seen.has(w.challengeId)) return { ...w, challengeId: undefined };
+    seen.add(w.challengeId);
+    return w;
+  });
+}
+
+function prepareWidgets(raw: unknown): Widget[] {
+  const base = raw ? sanitizeWidgets(raw) : DEFAULT_WIDGETS;
+  return bindOrphanChallenges(dedupeChallengeBindings(base));
 }
 
 function hasMovedToday(): boolean {
@@ -173,7 +217,9 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
   
   const [widgets, setWidgets] = useState<Widget[]>(() => {
     const saved = localStorage.getItem('awake_cockpit_widgets');
-    return saved ? sanitizeWidgets(JSON.parse(saved)) : DEFAULT_WIDGETS;
+    return saved
+      ? prepareWidgets(JSON.parse(saved))
+      : prepareWidgets(null);
   });
 
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -257,9 +303,6 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
   };
 
   const handleAddWidget = (type: Widget['type']) => {
-    if (type === 'daily-challenge' && widgets.some((w) => w.type === 'daily-challenge')) {
-      return;
-    }
     const newWidget: Widget = {
       id: `w-${Date.now()}`,
       type,
@@ -269,8 +312,27 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
     setIsWidgetPickerOpen(false);
   };
 
+  const handleBindChallenge = (widgetId: string, challengeId: string) => {
+    setWidgets((prev) =>
+      prev.map((w) => (w.id === widgetId ? { ...w, challengeId } : w))
+    );
+    notifyCockpitLocalChanged();
+  };
+
+  const handleUnbindChallenge = (widgetId: string) => {
+    setWidgets((prev) =>
+      prev.map((w) => (w.id === widgetId ? { ...w, challengeId: undefined } : w))
+    );
+    notifyCockpitLocalChanged();
+  };
+
   const handleRemoveWidget = (id: string) => {
-    setWidgets(widgets.filter(w => w.id !== id).map((w, i) => ({ ...w, position: i })));
+    const removed = widgets.find((w) => w.id === id);
+    if (removed?.type === 'daily-challenge' && removed.challengeId) {
+      deleteChallenge(removed.challengeId);
+      notifyCockpitLocalChanged();
+    }
+    setWidgets(widgets.filter((w) => w.id !== id).map((w, i) => ({ ...w, position: i })));
   };
 
   const handleReorderWidgets = (fromId: string, toId: string) => {
@@ -304,7 +366,10 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
   }, []);
 
   const sessionSteps = useMemo(() => {
-    const hasChallenge = !!readDailyChallengeState().challenge;
+    const challenges = readDailyChallenges();
+    const hasChallenge = challenges.length > 0;
+    const allShownUp = hasShownUpToAllChallengesToday();
+    const singleChallenge = challenges.length === 1 ? challenges[0] : null;
     return [
       {
         id: 'checkin',
@@ -316,10 +381,13 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
         id: 'showup',
         label: hasChallenge ? 'Show up' : 'Set challenge',
         hint: hasChallenge
-          ? 'Hit your minimum bar'
+          ? challenges.length > 1
+            ? `Log each challenge (${challenges.filter((c) => hasShownUpToday(c.id)).length}/${challenges.length})`
+            : 'Hit your minimum bar'
           : 'Name your commitment',
-        done: hasChallenge && hasShownUpToday(),
-        tappable: hasChallenge,
+        done: hasChallenge && allShownUp,
+        tappable: !!singleChallenge,
+        challengeId: singleChallenge?.id,
       },
       {
         id: 'move',
@@ -330,9 +398,8 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
     ];
   }, [todayRitual, sessionTick]);
 
-  const handleSessionShowUp = () => {
-    if (!readDailyChallengeState().challenge) return;
-    const logged = toggleShowUpToday();
+  const handleSessionShowUp = (challengeId: string) => {
+    const logged = toggleShowUpToday(challengeId);
     if (logged) triggerSmallCelebration();
     notifyCockpitLocalChanged();
     setSessionTick((n) => n + 1);
@@ -470,7 +537,11 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
                 <StepEl
                   key={step.id}
                   type={step.tappable ? 'button' : undefined}
-                  onClick={step.tappable ? handleSessionShowUp : undefined}
+                  onClick={
+                    step.tappable && step.challengeId
+                      ? () => handleSessionShowUp(step.challengeId!)
+                      : undefined
+                  }
                   title={
                     step.tappable
                       ? step.done
@@ -502,7 +573,7 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
                 <>
                   <span className="opacity-60">Check in</span> — where you are today.
                   {' '}
-                  <span className="opacity-60">Show up</span> — enter your challenge (minimum bar counts).
+                  <span className="opacity-60">Show up</span> — enter each challenge (log show-up on each widget).
                   {' '}
                   <span className="opacity-60">Move</span> — leave a trace (artifact vault, Today task, or Playbook).
                 </>
@@ -541,6 +612,8 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
                 setNewBinItem={setNewBinItem}
                 onRelease={handleReleaseToBin}
                 onRemove={() => handleRemoveWidget(widget.id)}
+                onBindChallenge={(challengeId) => handleBindChallenge(widget.id, challengeId)}
+                onUnbindChallenge={() => handleUnbindChallenge(widget.id)}
                 onOpenDomains={() => setIsDomainsOpen(true)}
                 onUpdateUserData={onUpdateUserData}
                 isDragging={draggedWidgetId === widget.id}
@@ -689,15 +762,11 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
             >
               <h2 className="text-lg font-medium mb-4">Add a tool</h2>
               <div className="grid grid-cols-2 gap-3">
-                {WIDGET_TYPES.map(w => {
-                  const alreadyAdded =
-                    w.type === 'daily-challenge' && widgets.some((x) => x.type === 'daily-challenge');
-                  return (
+                {WIDGET_TYPES.map((w) => (
                   <button
                     key={w.type}
                     onClick={() => handleAddWidget(w.type)}
-                    disabled={alreadyAdded}
-                    className="p-4 rounded-xl flex flex-col items-center gap-2 hover:bg-white/5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                    className="p-4 rounded-xl flex flex-col items-center gap-2 hover:bg-white/5 transition-colors"
                     style={{
                       background: 'rgba(255,255,255,0.03)',
                       border: '1px solid rgba(255,255,255,0.08)',
@@ -705,12 +774,8 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
                   >
                     <w.icon className="w-6 h-6 opacity-60" />
                     <span className="text-sm">{w.name}</span>
-                    {alreadyAdded && (
-                      <span className="text-[10px] opacity-50">On dashboard</span>
-                    )}
                   </button>
-                  );
-                })}
+                ))}
               </div>
             </motion.div>
           </motion.div>
@@ -855,6 +920,8 @@ function WidgetCard({
   setNewBinItem,
   onRelease,
   onRemove,
+  onBindChallenge,
+  onUnbindChallenge,
   onOpenDomains,
   onUpdateUserData,
   isDragging,
@@ -872,6 +939,8 @@ function WidgetCard({
   setNewBinItem: (v: string) => void;
   onRelease: () => void;
   onRemove: () => void;
+  onBindChallenge: (challengeId: string) => void;
+  onUnbindChallenge: () => void;
   onOpenDomains: () => void;
   onUpdateUserData?: (data: Partial<UserData>) => void;
   isDragging?: boolean;
@@ -903,7 +972,11 @@ function WidgetCard({
       case 'daily-challenge':
         return (
           <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <DailyChallengeWidget />
+            <DailyChallengeWidget
+              challengeId={widget.challengeId}
+              onBindChallenge={onBindChallenge}
+              onUnbindChallenge={onUnbindChallenge}
+            />
           </div>
         );
 
@@ -1476,26 +1549,43 @@ function PlaybookWidget() {
   );
 }
 
-// Daily Challenge — user-defined container; showing up is the win
-function DailyChallengeWidget() {
-  const [state, setState] = useState(readDailyChallengeState);
+// Daily Challenge — each widget owns one challenge
+function DailyChallengeWidget({
+  challengeId,
+  onBindChallenge,
+  onUnbindChallenge,
+}: {
+  challengeId?: string;
+  onBindChallenge: (challengeId: string) => void;
+  onUnbindChallenge: () => void;
+}) {
+  const [challenge, setChallenge] = useState(() =>
+    challengeId ? getChallenge(challengeId) : null
+  );
   const [titleDraft, setTitleDraft] = useState('');
   const [minimumDraft, setMinimumDraft] = useState('Just show up — that counts.');
-  const [showedToday, setShowedToday] = useState(() => hasShownUpToday());
+  const [showedToday, setShowedToday] = useState(() =>
+    challengeId ? hasShownUpToday(challengeId) : false
+  );
   const [isEditing, setIsEditing] = useState(false);
 
-  const refresh = () => {
-    setState(readDailyChallengeState());
-    setShowedToday(hasShownUpToday());
-  };
+  const refresh = useCallback(() => {
+    const c = challengeId ? getChallenge(challengeId) : null;
+    setChallenge(c);
+    setShowedToday(challengeId ? hasShownUpToday(challengeId) : false);
+  }, [challengeId]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   useEffect(() => {
     const onSync = () => refresh();
     window.addEventListener(COCKPIT_SYNC_EVENT, onSync);
     return () => window.removeEventListener(COCKPIT_SYNC_EVENT, onSync);
-  }, []);
+  }, [refresh]);
 
-  const streak = computeChallengeStreak();
+  const streak = challengeId ? computeChallengeStreak(challengeId) : 0;
 
   const resetCreateDrafts = () => {
     setTitleDraft('');
@@ -1505,47 +1595,49 @@ function DailyChallengeWidget() {
 
   const handleCreate = () => {
     if (!titleDraft.trim()) return;
-    setDailyChallenge(titleDraft, minimumDraft);
+    const created = createChallenge(titleDraft, minimumDraft);
+    onBindChallenge(created.id);
     resetCreateDrafts();
     refresh();
     notifyCockpitLocalChanged();
   };
 
   const handleSaveEdit = () => {
-    if (!titleDraft.trim()) return;
-    updateDailyChallenge(titleDraft, minimumDraft);
+    if (!titleDraft.trim() || !challengeId) return;
+    updateChallenge(challengeId, titleDraft, minimumDraft);
     setIsEditing(false);
     refresh();
     notifyCockpitLocalChanged();
   };
 
   const startEditing = () => {
-    const c = readDailyChallengeState().challenge;
-    if (!c) return;
-    setTitleDraft(c.title);
-    setMinimumDraft(c.minimumBar);
+    if (!challenge) return;
+    setTitleDraft(challenge.title);
+    setMinimumDraft(challenge.minimumBar);
     setIsEditing(true);
   };
 
   const handleEndChallenge = () => {
-    clearDailyChallenge();
+    if (challengeId) deleteChallenge(challengeId);
+    onUnbindChallenge();
     resetCreateDrafts();
-    refresh();
+    setChallenge(null);
     notifyCockpitLocalChanged();
   };
 
   const toggleShowUp = () => {
+    if (!challengeId) return;
     if (showedToday) {
-      unlogShowUpToday();
+      unlogShowUpToday(challengeId);
     } else {
-      logShowUpToday();
+      logShowUpToday(challengeId);
       triggerSmallCelebration();
     }
     refresh();
     notifyCockpitLocalChanged();
   };
 
-  if (!state.challenge || isEditing) {
+  if (!challenge || isEditing) {
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden">
         <div className="mb-2 flex shrink-0 items-center gap-2">
@@ -1594,8 +1686,6 @@ function DailyChallengeWidget() {
       </div>
     );
   }
-
-  const { challenge } = state;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">

@@ -51,9 +51,20 @@ export function collectActiveDays(): Set<string> {
   try {
     const challengeRaw = localStorage.getItem('awake_daily_challenge');
     if (challengeRaw) {
-      const { logs } = JSON.parse(challengeRaw) as { logs?: Record<string, unknown> };
-      if (logs && typeof logs === 'object') {
-        for (const key of Object.keys(logs)) {
+      const parsed = JSON.parse(challengeRaw) as {
+        challenges?: { logs?: Record<string, unknown> }[];
+        logs?: Record<string, unknown>;
+      };
+      if (Array.isArray(parsed.challenges)) {
+        for (const c of parsed.challenges) {
+          if (c.logs && typeof c.logs === 'object') {
+            for (const key of Object.keys(c.logs)) {
+              if (/^\d{4}-\d{2}-\d{2}$/.test(key)) days.add(key);
+            }
+          }
+        }
+      } else if (parsed.logs && typeof parsed.logs === 'object') {
+        for (const key of Object.keys(parsed.logs)) {
           if (/^\d{4}-\d{2}-\d{2}$/.test(key)) days.add(key);
         }
       }

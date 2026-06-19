@@ -1,5 +1,5 @@
 /**
- * User-defined daily commitment — the container matters more than the output.
+ * User-defined daily commitments — each challenge is its own container.
  * "Gym" counts if you showed up, even if you only washed your hands.
  */
 
@@ -9,12 +9,18 @@ export interface DailyChallenge {
   /** The minimum bar — what still counts as showing up */
   minimumBar: string;
   startedAt: string;
+  /** YYYY-MM-DD local → optional note */
+  logs: Record<string, string>;
 }
 
-export interface DailyChallengeState {
-  challenge: DailyChallenge | null;
-  /** YYYY-MM-DD local → optional note */
-  logs: Record<string, string | undefined>;
+interface DailyChallengesState {
+  challenges: DailyChallenge[];
+}
+
+/** @deprecated Legacy single-challenge shape — migrated on read */
+interface LegacyDailyChallengeState {
+  challenge: Omit<DailyChallenge, 'logs'> | null;
+  logs?: Record<string, string | undefined>;
 }
 
 const STORAGE_KEY = 'awake_daily_challenge';
@@ -26,77 +32,143 @@ function localDateKey(d = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
-export function readDailyChallengeState(): DailyChallengeState {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return { challenge: null, logs: {} };
-  try {
-    const parsed = JSON.parse(raw) as DailyChallengeState;
+function normalizeLogs(raw: Record<string, string | undefined> | undefined): Record<string, string> {
+  if (!raw || typeof raw !== 'object') return {};
+  const logs: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(key)) logs[key] = value ?? '';
+  }
+  return logs;
+}
+
+function migrateState(parsed: unknown): DailyChallengesState {
+  if (!parsed || typeof parsed !== 'object') return { challenges: [] };
+  const data = parsed as LegacyDailyChallengeState & DailyChallengesState;
+
+  if (Array.isArray(data.challenges)) {
     return {
-      challenge: parsed.challenge ?? null,
-      logs: parsed.logs ?? {},
+      challenges: data.challenges
+        .filter((c): c is DailyChallenge => !!c && typeof c.id === 'string')
+        .map((c) => ({
+          id: c.id,
+          title: c.title ?? '',
+          minimumBar: c.minimumBar || 'Just show up — that counts.',
+          startedAt: c.startedAt ?? new Date().toISOString(),
+          logs: normalizeLogs(c.logs),
+        })),
     };
+  }
+
+  if (data.challenge && typeof data.challenge === 'object') {
+    return {
+      challenges: [
+        {
+          ...data.challenge,
+          minimumBar: data.challenge.minimumBar || 'Just show up — that counts.',
+          logs: normalizeLogs(data.logs),
+        },
+      ],
+    };
+  }
+
+  return { challenges: [] };
+}
+
+function readState(): DailyChallengesState {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return { challenges: [] };
+  try {
+    return migrateState(JSON.parse(raw));
   } catch {
-    return { challenge: null, logs: {} };
+    return { challenges: [] };
   }
 }
 
-function writeDailyChallengeState(state: DailyChallengeState): void {
+function writeState(state: DailyChallengesState): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-export function setDailyChallenge(title: string, minimumBar: string): DailyChallenge {
+export function readDailyChallenges(): DailyChallenge[] {
+  return readState().challenges;
+}
+
+export function getChallenge(id: string): DailyChallenge | null {
+  return readState().challenges.find((c) => c.id === id) ?? null;
+}
+
+export function createChallenge(title: string, minimumBar: string): DailyChallenge {
   const challenge: DailyChallenge = {
-    id: `dc-${Date.now()}`,
+    id: `dc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     title: title.trim(),
     minimumBar: minimumBar.trim() || 'Just show up — that counts.',
     startedAt: new Date().toISOString(),
+    logs: {},
   };
-  writeDailyChallengeState({ challenge, logs: {} });
+  const state = readState();
+  writeState({ challenges: [...state.challenges, challenge] });
   return challenge;
 }
 
-/** Rename or change minimum bar — keeps show-up logs. */
-export function updateDailyChallenge(title: string, minimumBar: string): DailyChallenge | null {
-  const state = readDailyChallengeState();
-  if (!state.challenge) return null;
-  const challenge: DailyChallenge = {
-    ...state.challenge,
+export function updateChallenge(
+  id: string,
+  title: string,
+  minimumBar: string,
+): DailyChallenge | null {
+  const state = readState();
+  const idx = state.challenges.findIndex((c) => c.id === id);
+  if (idx < 0) return null;
+  const updated: DailyChallenge = {
+    ...state.challenges[idx],
     title: title.trim(),
     minimumBar: minimumBar.trim() || 'Just show up — that counts.',
   };
-  writeDailyChallengeState({ ...state, challenge });
-  return challenge;
+  const challenges = [...state.challenges];
+  challenges[idx] = updated;
+  writeState({ challenges });
+  return updated;
 }
 
-export function clearDailyChallenge(): void {
-  writeDailyChallengeState({ challenge: null, logs: {} });
+export function deleteChallenge(id: string): void {
+  const state = readState();
+  writeState({ challenges: state.challenges.filter((c) => c.id !== id) });
 }
 
-export function logShowUpToday(note?: string): boolean {
-  const state = readDailyChallengeState();
-  if (!state.challenge) return false;
+export function logShowUpToday(challengeId: string, note?: string): boolean {
+  const state = readState();
+  const idx = state.challenges.findIndex((c) => c.id === challengeId);
+  if (idx < 0) return false;
   const today = localDateKey();
-  // Use '' not undefined — JSON.stringify omits undefined values, so the log never persisted.
-  state.logs[today] = note?.trim() ?? '';
-  writeDailyChallengeState(state);
+  const challenges = [...state.challenges];
+  challenges[idx] = {
+    ...challenges[idx],
+    logs: { ...challenges[idx].logs, [today]: note?.trim() ?? '' },
+  };
+  writeState({ challenges });
   return true;
 }
 
-export function unlogShowUpToday(): void {
-  const state = readDailyChallengeState();
+export function unlogShowUpToday(challengeId: string): void {
+  const state = readState();
+  const idx = state.challenges.findIndex((c) => c.id === challengeId);
+  if (idx < 0) return;
   const today = localDateKey();
-  delete state.logs[today];
-  writeDailyChallengeState(state);
+  const logs = { ...state.challenges[idx].logs };
+  delete logs[today];
+  const challenges = [...state.challenges];
+  challenges[idx] = { ...challenges[idx], logs };
+  writeState({ challenges });
 }
 
-export function hasShownUpToday(): boolean {
-  const state = readDailyChallengeState();
-  return localDateKey() in state.logs;
+export function hasShownUpToday(challengeId: string): boolean {
+  const challenge = getChallenge(challengeId);
+  if (!challenge) return false;
+  return localDateKey() in challenge.logs;
 }
 
-export function computeChallengeStreak(): number {
-  const { logs } = readDailyChallengeState();
-  const days = new Set(Object.keys(logs));
+export function computeChallengeStreak(challengeId: string): number {
+  const challenge = getChallenge(challengeId);
+  if (!challenge) return 0;
+  const days = new Set(Object.keys(challenge.logs));
   if (days.size === 0) return 0;
 
   const today = new Date();
@@ -123,8 +195,23 @@ export function computeChallengeStreak(): number {
   return streak;
 }
 
-/** For overall Awake streak — days user logged show-up */
+export function hasActiveChallenges(): boolean {
+  return readDailyChallenges().length > 0;
+}
+
+/** Show-up step complete when every active challenge is logged today. */
+export function hasShownUpToAllChallengesToday(): boolean {
+  const challenges = readDailyChallenges();
+  if (challenges.length === 0) return false;
+  const today = localDateKey();
+  return challenges.every((c) => today in c.logs);
+}
+
+/** For overall Awake streak — days user logged show-up on any challenge */
 export function collectChallengeActiveDays(): Set<string> {
-  const { logs } = readDailyChallengeState();
-  return new Set(Object.keys(logs));
+  const days = new Set<string>();
+  for (const c of readDailyChallenges()) {
+    for (const key of Object.keys(c.logs)) days.add(key);
+  }
+  return days;
 }

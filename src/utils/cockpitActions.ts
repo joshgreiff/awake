@@ -1,7 +1,8 @@
 import {
   hasShownUpToday,
+  hasShownUpToAllChallengesToday,
   logShowUpToday,
-  readDailyChallengeState,
+  readDailyChallenges,
   unlogShowUpToday,
 } from './dailyChallenge';
 
@@ -21,29 +22,37 @@ export function tryParseShowUpLog(message: string): {
   const text = message.trim();
   if (!text) return { action: 'none' };
 
-  const challenge = readDailyChallengeState().challenge;
-  if (!challenge) return { action: 'none' };
+  const challenges = readDailyChallenges();
+  if (challenges.length === 0) return { action: 'none' };
 
   if (/\bunlog\b|\bundid\b|\bundo\b/i.test(text) && /\bshow[\s-]?up\b/i.test(text)) {
-    if (!hasShownUpToday()) return { action: 'none' };
-    unlogShowUpToday();
-    return { action: 'unlog', challengeTitle: challenge.title };
+    const logged = challenges.filter((c) => hasShownUpToday(c.id));
+    if (logged.length === 0) return { action: 'none' };
+    const target = logged[logged.length - 1];
+    unlogShowUpToday(target.id);
+    return { action: 'unlog', challengeTitle: target.title };
   }
 
   if (!SHOW_UP_PATTERNS.some((p) => p.test(text))) return { action: 'none' };
-  if (hasShownUpToday()) return { action: 'none', challengeTitle: challenge.title };
 
-  logShowUpToday();
-  return { action: 'log', challengeTitle: challenge.title };
+  const pending = challenges.find((c) => !hasShownUpToday(c.id));
+  if (!pending) {
+    return { action: 'none', challengeTitle: challenges[0]?.title };
+  }
+
+  logShowUpToday(pending.id);
+  return { action: 'log', challengeTitle: pending.title };
 }
 
-export function toggleShowUpToday(): boolean {
-  const challenge = readDailyChallengeState().challenge;
+export function toggleShowUpToday(challengeId: string): boolean {
+  const challenge = readDailyChallenges().find((c) => c.id === challengeId);
   if (!challenge) return false;
-  if (hasShownUpToday()) {
-    unlogShowUpToday();
+  if (hasShownUpToday(challengeId)) {
+    unlogShowUpToday(challengeId);
     return false;
   }
-  logShowUpToday();
+  logShowUpToday(challengeId);
   return true;
 }
+
+export { hasShownUpToAllChallengesToday };
