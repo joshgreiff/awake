@@ -12,7 +12,7 @@ import {
   Settings, Trash2, Plus,
   Sun, Moon, Star, Hexagon,
   Calendar, CheckCircle2, Circle, Rocket, LogOut, UserRound, X,
-  GripVertical, Trophy, ChevronDown, Gem
+  GripVertical, Trophy, ChevronDown, Gem, Pencil
 } from 'lucide-react';
 import { triggerSmallCelebration } from '../utils/confetti';
 import {
@@ -32,6 +32,7 @@ import {
   readDailyChallengeState,
   setDailyChallenge,
   unlogShowUpToday,
+  updateDailyChallenge,
 } from '../utils/dailyChallenge';
 import { toggleShowUpToday } from '../utils/cockpitActions';
 import {
@@ -256,6 +257,9 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
   };
 
   const handleAddWidget = (type: Widget['type']) => {
+    if (type === 'daily-challenge' && widgets.some((w) => w.type === 'daily-challenge')) {
+      return;
+    }
     const newWidget: Widget = {
       id: `w-${Date.now()}`,
       type,
@@ -302,14 +306,27 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
   const sessionSteps = useMemo(() => {
     const hasChallenge = !!readDailyChallengeState().challenge;
     return [
-      { id: 'checkin', label: 'Check in', done: !!todayRitual },
+      {
+        id: 'checkin',
+        label: 'Check in',
+        hint: 'Morning ritual',
+        done: !!todayRitual,
+      },
       {
         id: 'showup',
         label: hasChallenge ? 'Show up' : 'Set challenge',
+        hint: hasChallenge
+          ? 'Hit your minimum bar'
+          : 'Name your commitment',
         done: hasChallenge && hasShownUpToday(),
         tappable: hasChallenge,
       },
-      { id: 'move', label: 'Move', done: hasMovedToday() },
+      {
+        id: 'move',
+        label: 'Move',
+        hint: 'Log proof you crafted something',
+        done: hasMovedToday(),
+      },
     ];
   }, [todayRitual, sessionTick]);
 
@@ -454,8 +471,16 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
                   key={step.id}
                   type={step.tappable ? 'button' : undefined}
                   onClick={step.tappable ? handleSessionShowUp : undefined}
-                  title={step.tappable ? (step.done ? 'Undo show-up' : 'Log show-up') : undefined}
-                  className={`flex flex-1 flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center transition-colors ${
+                  title={
+                    step.tappable
+                      ? step.done
+                        ? 'Undo show-up'
+                        : 'Log show-up — hit your minimum bar on today\'s challenge'
+                      : step.id === 'move'
+                        ? 'Complete when you log an artifact, Today task, or Playbook lever'
+                        : undefined
+                  }
+                  className={`flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-center transition-colors ${
                     step.done ? 'bg-emerald-500/10' : 'bg-white/[0.03]'
                   } ${step.tappable ? 'hover:bg-white/[0.06] cursor-pointer' : ''}`}
                 >
@@ -464,7 +489,8 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
                   ) : (
                     <Circle className="h-4 w-4 opacity-30" />
                   )}
-                  <span className="text-[10px] leading-tight opacity-60">{step.label}</span>
+                  <span className="text-[10px] font-medium leading-tight opacity-70">{step.label}</span>
+                  <span className="text-[8px] leading-tight opacity-40">{step.hint}</span>
                 </StepEl>
               );
             })}
@@ -472,7 +498,15 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
           <p className="mt-3 text-[11px] leading-relaxed opacity-35">
             {sessionComplete
               ? 'You showed up inside the container. Come back tomorrow for the next round.'
-              : "Check in → show up to your challenge → complete one move. That's the whole game today."}
+              : (
+                <>
+                  <span className="opacity-60">Check in</span> — where you are today.
+                  {' '}
+                  <span className="opacity-60">Show up</span> — enter your challenge (minimum bar counts).
+                  {' '}
+                  <span className="opacity-60">Move</span> — leave a trace (artifact vault, Today task, or Playbook).
+                </>
+              )}
           </p>
           {sessionComplete && <SessionArtifactPrompt onLogged={() => setSessionTick((n) => n + 1)} />}
         </div>
@@ -655,11 +689,15 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
             >
               <h2 className="text-lg font-medium mb-4">Add a tool</h2>
               <div className="grid grid-cols-2 gap-3">
-                {WIDGET_TYPES.map(w => (
+                {WIDGET_TYPES.map(w => {
+                  const alreadyAdded =
+                    w.type === 'daily-challenge' && widgets.some((x) => x.type === 'daily-challenge');
+                  return (
                   <button
                     key={w.type}
                     onClick={() => handleAddWidget(w.type)}
-                    className="p-4 rounded-xl flex flex-col items-center gap-2 hover:bg-white/5 transition-colors"
+                    disabled={alreadyAdded}
+                    className="p-4 rounded-xl flex flex-col items-center gap-2 hover:bg-white/5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                     style={{
                       background: 'rgba(255,255,255,0.03)',
                       border: '1px solid rgba(255,255,255,0.08)',
@@ -667,8 +705,12 @@ export function Cockpit({ userData, onSignOut, onUpdateUserData }: CockpitProps)
                   >
                     <w.icon className="w-6 h-6 opacity-60" />
                     <span className="text-sm">{w.name}</span>
+                    {alreadyAdded && (
+                      <span className="text-[10px] opacity-50">On dashboard</span>
+                    )}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </motion.div>
           </motion.div>
@@ -1440,6 +1482,7 @@ function DailyChallengeWidget() {
   const [titleDraft, setTitleDraft] = useState('');
   const [minimumDraft, setMinimumDraft] = useState('Just show up — that counts.');
   const [showedToday, setShowedToday] = useState(() => hasShownUpToday());
+  const [isEditing, setIsEditing] = useState(false);
 
   const refresh = () => {
     setState(readDailyChallengeState());
@@ -1454,10 +1497,39 @@ function DailyChallengeWidget() {
 
   const streak = computeChallengeStreak();
 
+  const resetCreateDrafts = () => {
+    setTitleDraft('');
+    setMinimumDraft('Just show up — that counts.');
+    setIsEditing(false);
+  };
+
   const handleCreate = () => {
     if (!titleDraft.trim()) return;
     setDailyChallenge(titleDraft, minimumDraft);
-    setTitleDraft('');
+    resetCreateDrafts();
+    refresh();
+    notifyCockpitLocalChanged();
+  };
+
+  const handleSaveEdit = () => {
+    if (!titleDraft.trim()) return;
+    updateDailyChallenge(titleDraft, minimumDraft);
+    setIsEditing(false);
+    refresh();
+    notifyCockpitLocalChanged();
+  };
+
+  const startEditing = () => {
+    const c = readDailyChallengeState().challenge;
+    if (!c) return;
+    setTitleDraft(c.title);
+    setMinimumDraft(c.minimumBar);
+    setIsEditing(true);
+  };
+
+  const handleEndChallenge = () => {
+    clearDailyChallenge();
+    resetCreateDrafts();
     refresh();
     notifyCockpitLocalChanged();
   };
@@ -1473,12 +1545,14 @@ function DailyChallengeWidget() {
     notifyCockpitLocalChanged();
   };
 
-  if (!state.challenge) {
+  if (!state.challenge || isEditing) {
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden">
         <div className="mb-2 flex shrink-0 items-center gap-2">
           <Trophy className="h-4 w-4 text-amber-400" />
-          <span className="text-xs opacity-50">Daily Challenge</span>
+          <span className="text-xs opacity-50">
+            {isEditing ? 'Edit challenge' : 'Daily Challenge'}
+          </span>
         </div>
         <input
           type="text"
@@ -1494,14 +1568,29 @@ function DailyChallengeWidget() {
           placeholder="Minimum bar"
           className="mb-2 w-full shrink-0 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-[10px] opacity-80 focus:border-amber-400/50 focus:outline-none"
         />
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={!titleDraft.trim()}
-          className="mt-auto shrink-0 rounded-lg bg-amber-400/20 py-2 text-xs transition-colors hover:bg-amber-400/30 disabled:opacity-30"
-        >
-          Start challenge
-        </button>
+        <div className="mt-auto flex shrink-0 gap-2">
+          {isEditing && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditing(false);
+                setTitleDraft('');
+                setMinimumDraft('Just show up — that counts.');
+              }}
+              className="flex-1 rounded-lg bg-white/5 py-2 text-xs transition-colors hover:bg-white/10"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={isEditing ? handleSaveEdit : handleCreate}
+            disabled={!titleDraft.trim()}
+            className="flex-1 rounded-lg bg-amber-400/20 py-2 text-xs transition-colors hover:bg-amber-400/30 disabled:opacity-30"
+          >
+            {isEditing ? 'Save' : 'Start challenge'}
+          </button>
+        </div>
       </div>
     );
   }
@@ -1515,9 +1604,19 @@ function DailyChallengeWidget() {
           <Trophy className="h-4 w-4 shrink-0 text-amber-400" />
           <span className="truncate text-xs font-medium">{challenge.title}</span>
         </div>
-        {streak > 0 && (
-          <span className="shrink-0 text-[10px] tabular-nums text-amber-300/90">{streak}d</span>
-        )}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {streak > 0 && (
+            <span className="text-[10px] tabular-nums text-amber-300/90">{streak}d</span>
+          )}
+          <button
+            type="button"
+            onClick={startEditing}
+            title="Edit challenge name"
+            className="rounded p-0.5 opacity-40 transition-opacity hover:opacity-80"
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+        </div>
       </div>
       <p className="mb-2 line-clamp-2 shrink-0 text-[10px] leading-snug opacity-45">
         Min: {challenge.minimumBar}
@@ -1540,14 +1639,10 @@ function DailyChallengeWidget() {
       </button>
       <button
         type="button"
-        onClick={() => {
-          clearDailyChallenge();
-          refresh();
-          notifyCockpitLocalChanged();
-        }}
+        onClick={handleEndChallenge}
         className="mt-auto shrink-0 pt-2 text-[9px] opacity-30 hover:opacity-60"
       >
-        End challenge
+        End challenge & start new
       </button>
     </div>
   );

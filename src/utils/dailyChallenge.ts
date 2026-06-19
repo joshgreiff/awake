@@ -55,6 +55,19 @@ export function setDailyChallenge(title: string, minimumBar: string): DailyChall
   return challenge;
 }
 
+/** Rename or change minimum bar — keeps show-up logs. */
+export function updateDailyChallenge(title: string, minimumBar: string): DailyChallenge | null {
+  const state = readDailyChallengeState();
+  if (!state.challenge) return null;
+  const challenge: DailyChallenge = {
+    ...state.challenge,
+    title: title.trim(),
+    minimumBar: minimumBar.trim() || 'Just show up — that counts.',
+  };
+  writeDailyChallengeState({ ...state, challenge });
+  return challenge;
+}
+
 export function clearDailyChallenge(): void {
   writeDailyChallengeState({ challenge: null, logs: {} });
 }
