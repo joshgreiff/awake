@@ -3,6 +3,7 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
+    { "source": "/clearing", "destination": "/clearing.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

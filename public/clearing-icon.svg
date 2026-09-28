@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="sky" cx="0.5" cy="0.35" r="0.8">
+      <stop offset="0" stop-color="#1b2440"/>
+      <stop offset="1" stop-color="#070a14"/>
+    </radialGradient>
+    <radialGradient id="moon" cx="0.42" cy="0.4">
+      <stop offset="0" stop-color="#fff8e6"/>
+      <stop offset="1" stop-color="#d9cfb6"/>
+    </radialGradient>
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#fff0c0"/>
+      <stop offset="0.45" stop-color="#ff9a3c"/>
+      <stop offset="1" stop-color="#ff5a1a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5">
+      <stop offset="0" stop-color="#ff8a3c" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ff8a3c" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#sky)"/>
+  <circle cx="22" cy="10" r="0.9" fill="#e8eeff" opacity="0.8"/>
+  <circle cx="48" cy="14" r="0.7" fill="#e8eeff" opacity="0.7"/>
+  <circle cx="12" cy="22" r="0.6" fill="#e8eeff" opacity="0.6"/>
+  <circle cx="54" cy="28" r="0.6" fill="#e8eeff" opacity="0.6"/>
+  <circle cx="30" cy="21" r="12" fill="#c9d0e6" opacity="0.12"/>
+  <circle cx="30" cy="21" r="7.5" fill="url(#moon)"/>
+  <path d="M0 44 L7 30 L11 38 L15 26 L21 44 Z" fill="#04060b"/>
+  <path d="M43 44 L49 28 L53 37 L57 24 L64 40 L64 44 Z" fill="#04060b"/>
+  <path d="M0 44 C16 40 48 40 64 44 L64 64 L0 64 Z" fill="#05070c"/>
+  <ellipse cx="32" cy="50" rx="16" ry="9" fill="url(#glow)"/>
+  <path d="M28.5 54 C26 49 29.5 45 32 39 C34.5 45 38 49 35.5 54 Z" fill="url(#flame)"/>
+  <path d="M25 55.5 L39 52.5 M25.5 52.5 L38.5 55.5" stroke="#3a2416" stroke-width="2.2" stroke-linecap="round"/>
+</svg>
