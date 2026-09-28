@@ -20,7 +20,10 @@ export function openingMask(x: number, z: number): number {
   return 1 - smoothstep(0.42, 0.95, Math.abs(angle));
 }
 
-export function heightAt(x: number, z: number): number {
+/** A small pond in the meadow, placed so the moon's reflection lines up from the fire. */
+export const POND = { x: -4.2, z: -21, r: 4.2 };
+
+function baseHeight(x: number, z: number): number {
   const r = Math.hypot(x, z);
   const open = openingMask(x, z);
   const outer = smoothstep(8, 24, r);
@@ -28,6 +31,22 @@ export function heightAt(x: number, z: number): number {
   let h = (fbm(x * 0.03 + 11.3, z * 0.03 - 4.1, 4) - 0.5) * 6 * outer;
   h += smoothstep(14, 70, r) * 3.2 * (1 - open);
   h -= open * smoothstep(15, 75, r) * 11;
+  return h;
+}
+
+const POND_LEVEL = baseHeight(POND.x, POND.z);
+export const WATER_Y = POND_LEVEL - 0.12;
+
+export function heightAt(x: number, z: number): number {
+  const r = Math.hypot(x, z);
+  let h = baseHeight(x, z);
+
+  const pd = Math.hypot(x - POND.x, z - POND.z);
+  if (pd < POND.r + 5) {
+    h += (POND_LEVEL - h) * (1 - smoothstep(POND.r, POND.r + 5, pd));
+    h -= 0.5 * (1 - smoothstep(POND.r * 0.7, POND.r * 1.05, pd));
+  }
+
   h += (valueNoise(x * 0.5, z * 0.5, 7) - 0.5) * 0.12 * smoothstep(1.2, 3, r);
   h -= (1 - smoothstep(0, 1.1, r)) * 0.08;
   return h;

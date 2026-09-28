@@ -4,24 +4,20 @@ import {
   Color,
   DoubleSide,
   Euler,
-  InstancedBufferAttribute,
   InstancedMesh,
   Matrix4,
   Mesh,
   MeshLambertMaterial,
   PlaneGeometry,
   Quaternion,
-  ShaderMaterial,
-  UniformsLib,
-  UniformsUtils,
   Vector3,
 } from 'three';
-import { CLEARING_RADIUS, ColliderGrid, heightAt, openingMask } from './layout';
+import { CLEARING_RADIUS, ColliderGrid, POND, heightAt, openingMask } from './layout';
 import { fbm, mulberry32, smoothstep, valueNoise } from './noise';
 
 export function createGround(): Mesh {
   const size = 280;
-  const segments = 200;
+  const segments = 256;
   const geo = new PlaneGeometry(size, size, segments, segments);
   geo.rotateX(-Math.PI / 2);
 
@@ -35,6 +31,7 @@ export function createGround(): Mesh {
   const needles = new Color('#26241b');
   const needlesB = new Color('#2f2c20');
   const meadow = new Color('#324329');
+  const mud = new Color('#1d1f16');
   const tmp = new Color();
   const tmp2 = new Color();
 
@@ -55,6 +52,9 @@ export function createGround(): Mesh {
     const meadowW = open * smoothstep(CLEARING_RADIUS - 2, CLEARING_RADIUS + 4, r);
     tmp.lerp(meadow, meadowW * 0.7);
 
+    const pd = Math.hypot(x - POND.x, z - POND.z);
+    tmp.lerp(mud, 1 - smoothstep(POND.r * 0.9, POND.r * 1.35, pd));
+
     const dirtW = 1 - smoothstep(1.6, 3.0 + patch * 0.8, r);
     tmp.lerp(dirt, dirtW);
     const ashW = 1 - smoothstep(0.6, 1.35, r);
@@ -71,18 +71,26 @@ export function createGround(): Mesh {
 
   const mesh = new Mesh(geo, new MeshLambertMaterial({ vertexColors: true }));
   mesh.name = 'ground';
+  mesh.receiveShadow = true;
   return mesh;
 }
 
 function bladeGeometry(): BufferGeometry {
   const rows = [0, 0.3, 0.58, 0.82];
   const verts: number[] = [];
+  const colors: number[] = [];
+  const root = new Color('#223318');
+  const tip = new Color('#4f6b34');
+  const c = new Color();
   for (const t of rows) {
     const w = 0.5 * Math.pow(1 - t, 0.85);
     const bend = t * t * 0.28;
     verts.push(-w, t, bend, w, t, bend);
+    c.copy(root).lerp(tip, t);
+    colors.push(c.r, c.g, c.b, c.r, c.g, c.b);
   }
   verts.push(0, 1, 0.34);
+  colors.push(tip.r, tip.g, tip.b);
   const index: number[] = [];
   for (let i = 0; i < rows.length - 1; i++) {
     const a = i * 2;
@@ -91,97 +99,86 @@ function bladeGeometry(): BufferGeometry {
   const last = (rows.length - 1) * 2;
   index.push(last, last + 1, last + 2);
 
+  const count = verts.length / 3;
+  const normals = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) normals[i * 3 + 1] = 1;
+
   const geo = new BufferGeometry();
   geo.setAttribute('position', new BufferAttribute(new Float32Array(verts), 3));
+  geo.setAttribute('normal', new BufferAttribute(normals, 3));
+  geo.setAttribute('color', new BufferAttribute(new Float32Array(colors), 3));
   geo.setIndex(index);
   return geo;
 }
 
 export interface GrassUniforms {
   uTime: { value: number };
-  uFire: { value: number };
+  /** Fire position in view space, updated per frame. */
+  uFireView: { value: Vector3 };
 }
 
+/**
+ * Instanced grass on a standard Lambert material (so it takes fire light and shadows),
+ * with wind injected into the vertex shader.
+ */
 export function createGrass(
   colliders: ColliderGrid,
   maxCount: number,
-  ambient: Color,
-  moon: Color,
 ): { mesh: InstancedMesh; uniforms: GrassUniforms } {
   const rng = mulberry32(90210);
   const geo = bladeGeometry();
+  const uniforms: GrassUniforms = { uTime: { value: 0 }, uFireView: { value: new Vector3() } };
 
-  const uniforms = UniformsUtils.merge([
-    UniformsLib.fog,
-    {
-      uTime: { value: 0 },
-      uFire: { value: 1 },
-      uAmbient: { value: ambient },
-      uMoon: { value: moon },
-      uFireColor: { value: new Color(1.0, 0.5, 0.2) },
-    },
-  ]);
-
-  const material = new ShaderMaterial({
-    uniforms,
-    side: DoubleSide,
-    fog: true,
-    vertexShader: /* glsl */ `
-      #include <common>
-      #include <fog_pars_vertex>
-      uniform float uTime;
-      attribute float aVar;
-      varying float vH;
-      varying float vVar;
-      varying vec3 vWorld;
-      void main() {
-        vH = position.y;
-        vVar = aVar;
-        vec4 world = modelMatrix * instanceMatrix * vec4(position, 1.0);
-        float gust = sin(uTime * 0.35 + world.x * 0.05) * 0.5 + 0.5;
-        float w = sin(uTime * 1.4 + world.x * 0.33 + world.z * 0.21) * 0.6
-                + sin(uTime * 2.9 + world.x * 0.9 - world.z * 0.4) * 0.18;
-        float bend = vH * vH * (0.06 + 0.1 * gust);
-        world.x += w * bend;
-        world.z += w * bend * 0.5;
-        vWorld = world.xyz;
-        vec4 mvPosition = viewMatrix * world;
+  const material = new MeshLambertMaterial({ vertexColors: true, side: DoubleSide });
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = uniforms.uTime;
+    shader.uniforms.uFireView = uniforms.uFireView;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uTime;')
+      .replace(
+        '#include <project_vertex>',
+        /* glsl */ `
+        vec4 mvPosition = vec4( transformed, 1.0 );
+        #ifdef USE_INSTANCING
+          mvPosition = instanceMatrix * mvPosition;
+        #endif
+        mvPosition = modelMatrix * mvPosition;
+        float gust = sin( uTime * 0.35 + mvPosition.x * 0.05 ) * 0.5 + 0.5;
+        float sway = sin( uTime * 1.4 + mvPosition.x * 0.33 + mvPosition.z * 0.21 ) * 0.6
+                   + sin( uTime * 2.9 + mvPosition.x * 0.9 - mvPosition.z * 0.4 ) * 0.18;
+        float bend = position.y * position.y * ( 0.06 + 0.1 * gust );
+        mvPosition.x += sway * bend;
+        mvPosition.z += sway * bend * 0.5;
+        mvPosition = viewMatrix * mvPosition;
         gl_Position = projectionMatrix * mvPosition;
-        #include <fog_vertex>
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      #include <common>
-      #include <fog_pars_fragment>
-      uniform float uFire;
-      uniform vec3 uAmbient;
-      uniform vec3 uMoon;
-      uniform vec3 uFireColor;
-      varying float vH;
-      varying float vVar;
-      varying vec3 vWorld;
-      void main() {
-        vec3 root = vec3(0.012, 0.022, 0.009);
-        vec3 tip = vec3(0.05, 0.085, 0.028);
-        vec3 albedo = mix(root, tip, vH) * (0.7 + 0.6 * vVar);
-        float d = length(vWorld - vec3(0.0, 0.9, 0.0));
-        vec3 fire = uFireColor * uFire / (1.0 + d * d * 0.55);
-        vec3 light = uAmbient + uMoon * (0.35 + 0.65 * vH) + fire;
-        gl_FragColor = vec4(albedo * light, 1.0);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-        #include <fog_fragment>
-      }
-    `,
-  });
+        `,
+      );
+    // Blades lean their normal toward the fire so it lights them from any side,
+    // plus a constant moonlit fill so they never go fully black.
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uFireView;')
+      .replace(
+        '#include <normal_fragment_begin>',
+        `#include <normal_fragment_begin>
+        vec3 upView = normalize( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz );
+        vec3 toFire = uFireView + vViewPosition;
+        toFire -= upView * dot( toFire, upView );
+        normal = normalize( upView * 2.4 + normalize( toFire + 1e-4 ) );`,
+      )
+      .replace(
+        '#include <aomap_fragment>',
+        '#include <aomap_fragment>\n  reflectedLight.indirectDiffuse += vec3( 0.07, 0.09, 0.15 ) * diffuseColor.rgb;',
+      );
+  };
+  material.customProgramCacheKey = () => 'clearing-grass';
 
   const mesh = new InstancedMesh(geo, material, maxCount);
-  const variation = new Float32Array(maxCount);
   const m = new Matrix4();
   const q = new Quaternion();
   const e = new Euler();
   const p = new Vector3();
   const s = new Vector3();
+  const c = new Color();
 
   let placed = 0;
   let attempts = 0;
@@ -201,23 +198,27 @@ export function createGrass(
     if (rng() > p0) continue;
     if (colliders.blocked(x, z, 0.05)) continue;
 
-    const tall = 0.26 + rng() * 0.34 + meadow * 0.3 * rng();
-    const wide = 0.055 + rng() * 0.04;
+    const pd = Math.hypot(x - POND.x, z - POND.z);
+    const reedy = 1 - smoothstep(POND.r * 0.95, POND.r * 1.6, pd);
+    const tall = 0.26 + rng() * 0.34 + meadow * 0.3 * rng() + reedy * (0.5 + rng() * 0.6);
+    const wide = 0.055 + rng() * 0.04 - reedy * 0.02;
     e.set((rng() - 0.5) * 0.35, rng() * Math.PI * 2, (rng() - 0.5) * 0.25);
     q.setFromEuler(e);
     p.set(x, heightAt(x, z) - 0.02, z);
     s.set(wide, tall, wide);
     m.compose(p, q, s);
     mesh.setMatrixAt(placed, m);
-    variation[placed] = rng();
+    const v = 0.7 + rng() * 0.6;
+    c.setRGB(v, v * (0.95 + rng() * 0.1), v * (0.85 + rng() * 0.2));
+    mesh.setColorAt(placed, c);
     placed++;
   }
 
-  geo.setAttribute('aVar', new InstancedBufferAttribute(variation, 1));
   mesh.count = placed;
   mesh.userData.placed = placed;
   mesh.frustumCulled = false;
+  mesh.receiveShadow = true;
   mesh.name = 'grass';
 
-  return { mesh, uniforms: uniforms as unknown as GrassUniforms };
+  return { mesh, uniforms };
 }

@@ -53,6 +53,7 @@ export function createFire(colliders: ColliderGrid): FireBuild {
     s.position.set(Math.sin(a) * r, 0.06, Math.cos(a) * r);
     s.scale.set(0.9 + rng() * 0.6, 0.6 + rng() * 0.4, 0.9 + rng() * 0.5);
     s.rotation.set(rng() * 3, rng() * 3, rng() * 3);
+    s.castShadow = true;
     group.add(s);
   }
 
@@ -322,6 +323,13 @@ export function createFire(colliders: ColliderGrid): FireBuild {
 
   const light = new PointLight(new Color('#ff8f45'), LIGHT_BASE, 28, 2);
   light.position.set(0, 1.0, 0);
+  light.castShadow = true;
+  light.shadow.mapSize.set(512, 512);
+  light.shadow.camera.near = 0.3;
+  light.shadow.camera.far = 26;
+  light.shadow.bias = -0.004;
+  light.shadow.normalBias = 0.04;
+  light.shadow.radius = 3;
   group.add(light);
 
   let smokeEnabled = true;

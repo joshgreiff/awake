@@ -5,9 +5,10 @@ import {
   FogExp2,
   HemisphereLight,
   InstancedMesh,
-  LinearSRGBColorSpace,
+  PCFShadowMap,
   PerspectiveCamera,
   Scene,
+  SRGBColorSpace,
   Vector3,
   Timer,
   WebGLRenderer,
@@ -20,6 +21,7 @@ import { createForest } from './forest';
 import { ColliderGrid, MOON_DIR } from './layout';
 import { createSky, SKY, type SkyBuild } from './sky';
 import { createGrass, createGround, type GrassUniforms } from './terrain';
+import { createPond, type Pond } from './water';
 
 export type QualityMode = 'auto' | 'low' | 'high';
 
@@ -29,12 +31,13 @@ interface QualityLevel {
   mist: boolean;
   smoke: boolean;
   antialias: boolean;
+  shadowMap: number;
 }
 
 const LEVELS: QualityLevel[] = [
-  { dprCap: 0.85, grass: 0.3, mist: false, smoke: false, antialias: false },
-  { dprCap: 1.25, grass: 0.6, mist: true, smoke: true, antialias: true },
-  { dprCap: 2, grass: 1, mist: true, smoke: true, antialias: true },
+  { dprCap: 0.85, grass: 0.3, mist: false, smoke: false, antialias: false, shadowMap: 0 },
+  { dprCap: 1.25, grass: 0.6, mist: true, smoke: true, antialias: true, shadowMap: 512 },
+  { dprCap: 2, grass: 1, mist: true, smoke: true, antialias: true, shadowMap: 1024 },
 ];
 
 const MAX_GRASS = 26000;
@@ -59,6 +62,7 @@ export class ClearingEngine {
   private readonly fire: FireBuild;
   private readonly fireflies: Fireflies;
   private readonly mist: Mist;
+  private readonly pond: Pond;
   private readonly grass: InstancedMesh;
   private readonly grassUniforms: GrassUniforms;
   private readonly container: HTMLElement;
@@ -74,6 +78,7 @@ export class ClearingEngine {
   private warmup = 2.5;
   private disposed = false;
   private forward = new Vector3();
+  private fireView = new Vector3();
 
   constructor(container: HTMLElement, opts: EngineOptions) {
     this.container = container;
@@ -88,7 +93,9 @@ export class ClearingEngine {
     });
     this.renderer.toneMapping = ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
-    this.renderer.setClearColor(new Color().setRGB(SKY.fog.x, SKY.fog.y, SKY.fog.z, LinearSRGBColorSpace));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = PCFShadowMap;
+    this.renderer.setClearColor(new Color().setRGB(SKY.fog.x, SKY.fog.y, SKY.fog.z, SRGBColorSpace));
     const canvas = this.renderer.domElement;
     canvas.style.display = 'block';
     canvas.style.width = '100%';
@@ -102,7 +109,7 @@ export class ClearingEngine {
     this.camera = new PerspectiveCamera(70, 1, 0.1, 1000);
 
     this.scene.fog = new FogExp2(
-      new Color().setRGB(SKY.fog.x, SKY.fog.y, SKY.fog.z, LinearSRGBColorSpace),
+      new Color().setRGB(SKY.fog.x, SKY.fog.y, SKY.fog.z, SRGBColorSpace),
       FOG_DENSITY,
     );
 
@@ -124,9 +131,10 @@ export class ClearingEngine {
     const forest = createForest(colliders);
     this.scene.add(forest.group);
 
-    const grassAmbient = new Color(0.1, 0.13, 0.22);
-    const grassMoon = new Color(0.22, 0.26, 0.38);
-    const grass = createGrass(colliders, MAX_GRASS, grassAmbient, grassMoon);
+    this.pond = createPond();
+    this.scene.add(this.pond.mesh);
+
+    const grass = createGrass(colliders, MAX_GRASS);
     this.grass = grass.mesh;
     this.grassUniforms = grass.uniforms;
     this.scene.add(this.grass);
@@ -215,6 +223,13 @@ export class ClearingEngine {
     this.grass.count = Math.floor(placed * lvl.grass);
     this.mist.group.visible = lvl.mist;
     this.fire.setSmokeEnabled(lvl.smoke);
+    const light = this.fire.light;
+    light.castShadow = lvl.shadowMap > 0;
+    if (lvl.shadowMap > 0 && light.shadow.mapSize.x !== lvl.shadowMap) {
+      light.shadow.mapSize.set(lvl.shadowMap, lvl.shadowMap);
+      light.shadow.map?.dispose();
+      light.shadow.map = null;
+    }
   }
 
   private resize(): void {
@@ -265,7 +280,12 @@ export class ClearingEngine {
     this.fireflies.update(t);
     if (this.mist.group.visible) this.mist.update(t, this.camera);
     this.grassUniforms.uTime.value = t;
-    this.grassUniforms.uFire.value = this.fire.intensity * 2.4;
+    this.camera.updateMatrixWorld();
+    this.fireView
+      .set(0, this.fire.group.position.y + 0.9, 0)
+      .applyMatrix4(this.camera.matrixWorldInverse);
+    this.grassUniforms.uFireView.value.copy(this.fireView);
+    this.pond.update(t, this.fire.intensity);
 
     if (this.audio) {
       this.camera.getWorldDirection(this.forward);

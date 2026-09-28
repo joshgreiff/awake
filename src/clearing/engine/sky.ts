@@ -27,7 +27,7 @@ import { fbm, GLSL_NOISE, mulberry32 } from './noise';
 export const SKY = {
   zenith: new Vector3(0.01, 0.014, 0.036),
   horizon: new Vector3(0.07, 0.085, 0.14),
-  fog: new Vector3(0.03, 0.04, 0.068),
+  fog: new Vector3(0.056, 0.068, 0.11),
   airglow: new Vector3(0.0, 0.028, 0.03),
   moonGlow: new Vector3(0.26, 0.26, 0.28),
 };

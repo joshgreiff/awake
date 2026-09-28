@@ -14,10 +14,14 @@ import {
   MeshLambertMaterial,
   Quaternion,
   Vector3,
+  type Material,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { CLEARING_RADIUS, ColliderGrid, heightAt, openingMask } from './layout';
+import { CLEARING_RADIUS, ColliderGrid, POND, heightAt, openingMask } from './layout';
 import { hash2, mulberry32, smoothstep } from './noise';
+
+/** Trees closer than this to the fire cast firelight shadows. */
+const SHADOW_RADIUS = 22;
 
 function jitterVertices(geo: BufferGeometry, amount: number, seed: number): BufferGeometry {
   const pos = geo.attributes.position as BufferAttribute;
@@ -37,28 +41,186 @@ function jitterVertices(geo: BufferGeometry, amount: number, seed: number): Buff
   return geo;
 }
 
-function coniferFoliage(): BufferGeometry {
-  const tiers = [
-    { r: 2.1, h: 3.8, y: 3.1 },
-    { r: 1.65, h: 3.2, y: 4.9 },
-    { r: 1.15, h: 2.8, y: 6.6 },
-    { r: 0.6, h: 1.8, y: 7.9 },
-  ];
+function tieredCrown(tiers: { r: number; h: number; y: number }[], seed: number, jitter: number): BufferGeometry {
   const parts = tiers.map((t, i) => {
     const cone = new ConeGeometry(t.r, t.h, 7, 1);
-    cone.rotateY(i * 0.7);
+    cone.rotateY(i * 0.7 + seed);
     cone.translate(0, t.y, 0);
     return cone;
   });
-  const merged = mergeGeometries(parts);
+  const merged = mergeGeometries(parts)!;
   parts.forEach((p) => p.dispose());
-  return jitterVertices(merged!, 0.32, 3);
+  return jitterVertices(merged, jitter, seed);
 }
 
-function coniferTrunk(): BufferGeometry {
-  const trunk = new CylinderGeometry(0.14, 0.26, 2.6, 6, 1, true);
-  trunk.translate(0, 1.2, 0);
-  return trunk;
+function trunk(rTop: number, rBottom: number, height: number, sides = 6): BufferGeometry {
+  const g = new CylinderGeometry(rTop, rBottom, height, sides, 1, true);
+  g.translate(0, height / 2 - 0.1, 0);
+  return g;
+}
+
+function birchCrown(): BufferGeometry {
+  const blobs = [
+    [0, 5.4, 0, 1.2],
+    [1.05, 6.1, 0.35, 1.0],
+    [-0.95, 6.0, -0.45, 1.05],
+    [0.15, 7.3, 0.2, 0.85],
+    [0.7, 4.8, -0.85, 0.8],
+    [-0.55, 5.0, 0.9, 0.8],
+    [-0.2, 6.6, -1.0, 0.75],
+    [0.9, 7.0, -0.2, 0.7],
+  ];
+  const parts = blobs.map(([x, y, z, r]) => {
+    const g = new IcosahedronGeometry(r * 0.85, 0);
+    g.scale(1, 0.75, 1);
+    g.translate(x * 0.7, 5.9 + (y - 5.9) * 0.8, z * 0.7);
+    return g;
+  });
+  const merged = mergeGeometries(parts)!;
+  parts.forEach((p) => p.dispose());
+  return jitterVertices(merged, 0.3, 61);
+}
+
+function snagGeometry(): BufferGeometry {
+  const parts: BufferGeometry[] = [trunk(0.05, 0.22, 9.2, 6)];
+  const branches = [
+    [4.2, 0.3, 2.0, 1.1],
+    [5.4, 2.4, 1.6, 1.0],
+    [6.3, 4.3, 1.8, 1.2],
+    [7.2, 1.2, 1.3, 0.9],
+    [3.4, 3.6, 1.2, 1.25],
+  ];
+  for (const [y, yaw, len, tilt] of branches) {
+    const b = new CylinderGeometry(0.02, 0.06, len, 5, 1, true);
+    b.translate(0, len / 2, 0);
+    b.rotateZ(-tilt);
+    b.rotateY(yaw);
+    b.translate(0, y, 0);
+    parts.push(b);
+  }
+  const merged = mergeGeometries(parts)!;
+  parts.forEach((p) => p.dispose());
+  return jitterVertices(merged, 0.05, 71);
+}
+
+type SpeciesId = 'pine' | 'spruce' | 'fir' | 'birch' | 'snag';
+
+interface Species {
+  crown: BufferGeometry | null;
+  trunk: BufferGeometry;
+  crownMat: Material | null;
+  trunkMat: Material;
+  trunkRadius: number;
+  crownColor(c: Color, rng: () => number): void;
+  trunkColor(c: Color, rng: () => number): void;
+}
+
+interface TreePlacement {
+  species: SpeciesId;
+  x: number;
+  z: number;
+  s: number;
+  sy: number;
+  rot: number;
+}
+
+function buildSpecies(): Record<SpeciesId, Species> {
+  const crownMat = new MeshLambertMaterial({ color: 0xffffff, flatShading: true });
+  const barkMat = new MeshLambertMaterial({ color: 0xffffff });
+  const conifer = (c: Color, rng: () => number) =>
+    c.setHSL(0.33 + rng() * 0.09, 0.26 + rng() * 0.16, 0.075 + rng() * 0.045);
+  const bark = (c: Color, rng: () => number) => c.set('#3a2c22').multiplyScalar(0.85 + rng() * 0.3);
+
+  return {
+    pine: {
+      crown: tieredCrown(
+        [
+          { r: 2.1, h: 3.8, y: 3.1 },
+          { r: 1.65, h: 3.2, y: 4.9 },
+          { r: 1.15, h: 2.8, y: 6.6 },
+          { r: 0.6, h: 1.8, y: 7.9 },
+        ],
+        3,
+        0.32,
+      ),
+      trunk: trunk(0.14, 0.26, 2.8),
+      crownMat,
+      trunkMat: barkMat,
+      trunkRadius: 0.28,
+      crownColor: conifer,
+      trunkColor: bark,
+    },
+    spruce: {
+      crown: tieredCrown(
+        Array.from({ length: 6 }, (_, i) => ({ r: 1.5 - i * 0.21, h: 2.3, y: 2.3 + i * 1.35 })),
+        7,
+        0.22,
+      ),
+      trunk: trunk(0.12, 0.22, 2.8),
+      crownMat,
+      trunkMat: barkMat,
+      trunkRadius: 0.24,
+      crownColor: (c, rng) => c.setHSL(0.4 + rng() * 0.06, 0.22 + rng() * 0.12, 0.065 + rng() * 0.035),
+      trunkColor: bark,
+    },
+    fir: {
+      crown: tieredCrown(
+        [
+          { r: 2.7, h: 3.4, y: 2.5 },
+          { r: 2.1, h: 3.0, y: 4.0 },
+          { r: 1.4, h: 2.6, y: 5.4 },
+        ],
+        11,
+        0.38,
+      ),
+      trunk: trunk(0.16, 0.3, 2.2),
+      crownMat,
+      trunkMat: barkMat,
+      trunkRadius: 0.3,
+      crownColor: (c, rng) => c.setHSL(0.3 + rng() * 0.08, 0.3 + rng() * 0.15, 0.08 + rng() * 0.04),
+      trunkColor: bark,
+    },
+    birch: {
+      crown: birchCrown(),
+      trunk: jitterVertices(trunk(0.07, 0.14, 7.6, 6), 0.04, 81),
+      crownMat,
+      trunkMat: barkMat,
+      trunkRadius: 0.14,
+      crownColor: (c, rng) => c.setHSL(0.2 + rng() * 0.06, 0.36 + rng() * 0.12, 0.13 + rng() * 0.05),
+      trunkColor: (c, rng) => {
+        const v = 0.48 + rng() * 0.12;
+        c.setRGB(v * 0.96, v * 0.96, v * 0.9);
+      },
+    },
+    snag: {
+      crown: null,
+      trunk: snagGeometry(),
+      crownMat: null,
+      trunkMat: barkMat,
+      trunkRadius: 0.22,
+      crownColor: () => undefined,
+      trunkColor: (c, rng) => {
+        const v = 0.16 + rng() * 0.05;
+        c.setRGB(v, v * 0.95, v * 0.88);
+      },
+    },
+  };
+}
+
+function pickSpecies(r: number, open: number, rng: () => number): SpeciesId {
+  const u = rng();
+  if (open > 0.12 && open < 0.85 && u < 0.14) return 'snag';
+  if (r < CLEARING_RADIUS + 9) {
+    if (u < 0.38) return 'pine';
+    if (u < 0.62) return 'fir';
+    if (u < 0.86) return 'birch';
+    return 'spruce';
+  }
+  if (u < 0.04) return 'snag';
+  if (u < 0.42) return 'pine';
+  if (u < 0.78) return 'spruce';
+  if (u < 0.93) return 'fir';
+  return 'birch';
 }
 
 export interface ForestBuild {
@@ -70,9 +232,29 @@ export function createForest(colliders: ColliderGrid): ForestBuild {
   const rng = mulberry32(4242);
   const group = new Group();
   group.name = 'forest';
+  const species = buildSpecies();
 
-  type Tree = { x: number; z: number; s: number; sy: number; rot: number };
-  const trees: Tree[] = [];
+  colliders.add({ x: POND.x, z: POND.z, r: POND.r * 0.82 });
+
+  // Hand-placed trees: an old giant pine framing the moon, and a few that step into the clearing.
+  const special: (TreePlacement & { clear: number })[] = [
+    { species: 'pine', x: -13.4, z: -9.6, s: 2.05, sy: 2.3, rot: 0.4, clear: 5 },
+    { species: 'birch', x: -9.6, z: 6.4, s: 1.15, sy: 1.1, rot: 1.2, clear: 2.4 },
+    { species: 'birch', x: -8.4, z: 8.3, s: 0.9, sy: 0.95, rot: 2.6, clear: 2 },
+    { species: 'pine', x: 10.8, z: 3.2, s: 1.05, sy: 1.15, rot: 2.2, clear: 2.6 },
+    { species: 'fir', x: 8.6, z: -9.6, s: 0.95, sy: 1.0, rot: 0.9, clear: 3 },
+    { species: 'birch', x: 12.6, z: -5.4, s: 1.0, sy: 1.1, rot: 4.0, clear: 2 },
+    { species: 'snag', x: 11.2, z: -17.5, s: 1.1, sy: 1.15, rot: 1.7, clear: 1.5 },
+  ];
+
+  const trees: TreePlacement[] = special.map((t) => ({
+    species: t.species,
+    x: t.x,
+    z: t.z,
+    s: t.s,
+    sy: t.sy,
+    rot: t.rot,
+  }));
   const cell = 2.7;
   const maxR = 88;
   for (let gx = -maxR; gx <= maxR; gx += cell) {
@@ -85,29 +267,17 @@ export function createForest(colliders: ColliderGrid): ForestBuild {
       let p = smoothstep(CLEARING_RADIUS - 0.5, CLEARING_RADIUS + 4.5, r);
       p *= 1 - open * (1 - smoothstep(58, 80, r) * 0.35);
       p *= 0.72;
-      if (rng() > p) continue;
+      const u = rng();
+      const sp = pickSpecies(r, open, rng);
+      if (u > p && !(sp === 'snag' && u < p + 0.05)) continue;
+      if (special.some((t) => Math.hypot(t.x - x, t.z - z) < t.clear)) continue;
+      if (Math.hypot(x - POND.x, z - POND.z) < POND.r + 3) continue;
       const edge = 1 - smoothstep(CLEARING_RADIUS, CLEARING_RADIUS + 10, r);
       const s = 0.75 + rng() * 0.6 + edge * 0.15;
-      trees.push({ x, z, s, sy: s * (0.85 + rng() * 0.4), rot: rng() * Math.PI * 2 });
+      trees.push({ species: sp, x, z, s, sy: s * (0.85 + rng() * 0.4), rot: rng() * Math.PI * 2 });
     }
   }
 
-  // A few lone trees that step into the clearing, so the tree line isn't a perfect circle.
-  const lone = [
-    { x: -9.6, z: 6.4, s: 1.25 },
-    { x: 10.8, z: 3.2, s: 1.05 },
-    { x: 8.1, z: -9.2, s: 0.95 },
-    { x: -11.8, z: -4.6, s: 1.3 },
-  ];
-  for (const t of lone) trees.push({ ...t, sy: t.s * 1.1, rot: rng() * 6.28 });
-
-  const foliageGeo = coniferFoliage();
-  const trunkGeo = coniferTrunk();
-  const foliageMat = new MeshLambertMaterial({ color: 0xffffff, flatShading: true });
-  const trunkMat = new MeshLambertMaterial({ color: '#3a2c22' });
-
-  const foliage = new InstancedMesh(foliageGeo, foliageMat, trees.length);
-  const trunks = new InstancedMesh(trunkGeo, trunkMat, trees.length);
   const m = new Matrix4();
   const q = new Quaternion();
   const e = new Euler();
@@ -115,22 +285,64 @@ export function createForest(colliders: ColliderGrid): ForestBuild {
   const s = new Vector3();
   const c = new Color();
 
-  trees.forEach((t, i) => {
-    const y = heightAt(t.x, t.z) - 0.25;
-    e.set((rng() - 0.5) * 0.06, t.rot, (rng() - 0.5) * 0.06);
-    q.setFromEuler(e);
-    p.set(t.x, y, t.z);
-    s.set(t.s, t.sy, t.s);
-    m.compose(p, q, s);
-    foliage.setMatrixAt(i, m);
-    trunks.setMatrixAt(i, m);
-    c.setHSL(0.33 + rng() * 0.09, 0.26 + rng() * 0.16, 0.075 + rng() * 0.045);
-    foliage.setColorAt(i, c);
-    colliders.add({ x: t.x, z: t.z, r: 0.28 * t.s + 0.15 });
+  for (const id of Object.keys(species) as SpeciesId[]) {
+    const sp = species[id];
+    const list = trees.filter((t) => t.species === id);
+    for (const near of [true, false]) {
+      const items = list.filter((t) => Math.hypot(t.x, t.z) < SHADOW_RADIUS === near);
+      if (items.length === 0) continue;
+      const trunks = new InstancedMesh(sp.trunk, sp.trunkMat, items.length);
+      const crowns = sp.crown && sp.crownMat ? new InstancedMesh(sp.crown, sp.crownMat, items.length) : null;
+      items.forEach((t, i) => {
+        e.set((rng() - 0.5) * 0.06, t.rot, (rng() - 0.5) * 0.06);
+        q.setFromEuler(e);
+        p.set(t.x, heightAt(t.x, t.z) - 0.2, t.z);
+        s.set(t.s, t.sy, t.s);
+        m.compose(p, q, s);
+        trunks.setMatrixAt(i, m);
+        sp.trunkColor(c, rng);
+        trunks.setColorAt(i, c);
+        if (crowns) {
+          crowns.setMatrixAt(i, m);
+          sp.crownColor(c, rng);
+          crowns.setColorAt(i, c);
+        }
+        colliders.add({ x: t.x, z: t.z, r: sp.trunkRadius * t.s + 0.15 });
+      });
+      for (const mesh of crowns ? [trunks, crowns] : [trunks]) {
+        mesh.computeBoundingSphere();
+        mesh.castShadow = near;
+        mesh.receiveShadow = near;
+        group.add(mesh);
+      }
+    }
+  }
+
+  const rockMat = new MeshLambertMaterial({ color: 0xffffff, flatShading: true });
+  const rockGeo = jitterVertices(new DodecahedronGeometry(0.6, 0), 0.18, 33);
+
+  // A small cairn by the pond: someone was here before you.
+  const cairnX = POND.x + POND.r + 1.3;
+  const cairnZ = POND.z + 0.8;
+  let cy = heightAt(cairnX, cairnZ) - 0.05;
+  const cairnStones = [
+    [0.62, 0.3],
+    [0.5, 0.26],
+    [0.4, 0.22],
+    [0.3, 0.2],
+    [0.2, 0.16],
+  ];
+  cairnStones.forEach(([w, h], i) => {
+    const stone = new Mesh(rockGeo, rockMat.clone());
+    (stone.material as MeshLambertMaterial).color.setRGB(0.19 - i * 0.012, 0.185 - i * 0.012, 0.175 - i * 0.01);
+    stone.scale.set(w, h, w * (0.85 + rng() * 0.3));
+    stone.rotation.set((rng() - 0.5) * 0.25, rng() * 6.28, (rng() - 0.5) * 0.25);
+    stone.position.set(cairnX + (rng() - 0.5) * 0.06, cy + h * 0.55, cairnZ + (rng() - 0.5) * 0.06);
+    cy += h * 0.95;
+    stone.castShadow = true;
+    group.add(stone);
   });
-  foliage.computeBoundingSphere();
-  trunks.computeBoundingSphere();
-  group.add(foliage, trunks);
+  colliders.add({ x: cairnX, z: cairnZ, r: 0.5 });
 
   // Low shrubs along the edge and under the trees.
   const shrubGeo = jitterVertices(new IcosahedronGeometry(0.8, 0), 0.25, 21);
@@ -161,17 +373,31 @@ export function createForest(colliders: ColliderGrid): ForestBuild {
   }
   shrubs.count = placedShrubs;
   shrubs.computeBoundingSphere();
+  shrubs.castShadow = true;
+  shrubs.receiveShadow = true;
   group.add(shrubs);
 
-  // Scattered boulders.
-  const rockGeo = jitterVertices(new DodecahedronGeometry(0.6, 0), 0.18, 33);
-  const rockCount = 26;
-  const rocks = new InstancedMesh(
-    rockGeo,
-    new MeshLambertMaterial({ color: 0xffffff, flatShading: true }),
-    rockCount,
-  );
+  // Scattered boulders, plus a few half-sunk stones around the pond rim.
+  const rockCount = 32;
+  const rocks = new InstancedMesh(rockGeo, rockMat, rockCount);
   let placedRocks = 0;
+  const placeRock = (x: number, z: number, sc: number, sink: number) => {
+    e.set(rng() * 6.28, rng() * 6.28, rng() * 6.28);
+    q.setFromEuler(e);
+    p.set(x, heightAt(x, z) + sc * sink, z);
+    s.set(sc * (0.9 + rng() * 0.5), sc * (0.5 + rng() * 0.35), sc * (0.9 + rng() * 0.5));
+    m.compose(p, q, s);
+    rocks.setMatrixAt(placedRocks, m);
+    const g = 0.12 + rng() * 0.06;
+    c.setRGB(g, g * 0.97, g * 0.93);
+    rocks.setColorAt(placedRocks, c);
+    placedRocks++;
+  };
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + rng() * 0.6;
+    const rr = POND.r * (0.92 + rng() * 0.12);
+    placeRock(POND.x + Math.sin(a) * rr, POND.z + Math.cos(a) * rr, 0.3 + rng() * 0.35, -0.05);
+  }
   for (let i = 0; i < rockCount * 6 && placedRocks < rockCount; i++) {
     const a = rng() * Math.PI * 2;
     const r = 6 + rng() * 24;
@@ -179,20 +405,13 @@ export function createForest(colliders: ColliderGrid): ForestBuild {
     const z = -Math.cos(a) * r;
     if (colliders.blocked(x, z, 0.8)) continue;
     const sc = 0.4 + Math.pow(rng(), 2) * 1.5;
-    e.set(rng() * 6.28, rng() * 6.28, rng() * 6.28);
-    q.setFromEuler(e);
-    p.set(x, heightAt(x, z) + sc * 0.12, z);
-    s.set(sc * (0.9 + rng() * 0.5), sc * (0.5 + rng() * 0.35), sc * (0.9 + rng() * 0.5));
-    m.compose(p, q, s);
-    rocks.setMatrixAt(placedRocks, m);
-    const g = 0.12 + rng() * 0.06;
-    c.setRGB(g, g * 0.97, g * 0.93);
-    rocks.setColorAt(placedRocks, c);
+    placeRock(x, z, sc, 0.12);
     if (sc > 0.7) colliders.add({ x, z, r: sc * 0.6 });
-    placedRocks++;
   }
   rocks.count = placedRocks;
   rocks.computeBoundingSphere();
+  rocks.castShadow = true;
+  rocks.receiveShadow = true;
   group.add(rocks);
 
   // Two logs to sit on, angled toward the fire.
@@ -208,6 +427,8 @@ export function createForest(colliders: ColliderGrid): ForestBuild {
     log.scale.set(1, seat.len / 2.6, 1);
     log.rotation.set(0, angle, Math.PI / 2, 'YXZ');
     log.position.set(seat.x, heightAt(seat.x, seat.z) + 0.24, seat.z);
+    log.castShadow = true;
+    log.receiveShadow = true;
     group.add(log);
     const dirX = Math.cos(angle);
     const dirZ = -Math.sin(angle);
