@@ -1,3 +1,4 @@
+import { HOLLOW, HOLLOW_FLOOR } from './layout';
 import { mulberry32 } from './noise';
 
 interface Pose {
@@ -39,6 +40,9 @@ export class ClearingAudio {
   private nextOwl = 0;
   private fireLevel = 1;
   private suspendTimer: number | null = null;
+  private windBus: GainNode | null = null;
+  private roarFilter: BiquadFilterNode | null = null;
+  private seated = false;
 
   get isEnabled(): boolean {
     return this.enabled;
@@ -90,6 +94,153 @@ export class ClearingAudio {
     if (this.fireRoar && this.ctx) {
       this.fireRoar.gain.setTargetAtTime(0.16 + level * 0.1, this.ctx.currentTime, 0.1);
     }
+  }
+
+  /** Seated by the fire: the fire comes forward and warms, the wind recedes. */
+  setSeated(on: boolean): void {
+    this.seated = on;
+    this.applySeated(0.9);
+  }
+
+  /** A short cluster of crackles, e.g. as the fire flares. */
+  crackleBurst(count: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.enabled) return;
+    let t = ctx.currentTime + 0.05;
+    for (let i = 0; i < count; i++) {
+      this.crackle(t);
+      t += 0.02 + this.rng() * 0.09;
+    }
+  }
+
+  /** A soft struck-glass tone, for small moments of noticing. */
+  chime(level = 0.5): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.enabled || !this.master) return;
+    const t = ctx.currentTime + 0.05;
+    const base = 660 + this.rng() * 80;
+    [1, 2.01, 2.76, 4.1].forEach((ratio, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = base * ratio;
+      const g = ctx.createGain();
+      const amp = (0.05 / (i + 1)) * level;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 2.8 - i * 0.4);
+      osc.connect(g);
+      g.connect(this.master!);
+      g.connect(this.reverbSend!);
+      osc.start(t);
+      osc.stop(t + 3);
+    });
+  }
+
+  /** Three slow, low swells from the hollow. */
+  signal(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.enabled || !this.master) return;
+    const t = ctx.currentTime + 0.1;
+    const panner = this.panner(HOLLOW.x, 2, HOLLOW.z, 14, 0.6, 'equalpower');
+    panner.connect(this.master);
+    const send = ctx.createGain();
+    send.gain.value = 0.8;
+    panner.connect(send).connect(this.reverbSend!);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    for (let i = 0; i < 3; i++) {
+      const s = t + i * 4.6;
+      env.gain.exponentialRampToValueAtTime(0.16, s + 1.6);
+      env.gain.exponentialRampToValueAtTime(0.0001, s + 4.4);
+    }
+    env.connect(panner);
+    for (const [f, a] of [
+      [73.4, 1],
+      [110.1, 0.5],
+      [146.8, 0.35],
+      [220.3, 0.12],
+    ]) {
+      const osc = ctx.createOscillator();
+      osc.frequency.value = f;
+      osc.detune.setValueAtTime(-6, t);
+      osc.detune.linearRampToValueAtTime(6, t + 14);
+      const g = ctx.createGain();
+      g.gain.value = a;
+      osc.connect(g).connect(env);
+      osc.start(t);
+      osc.stop(t + 14.5);
+    }
+  }
+
+  /** A few seconds of a damaged recording: a voice you can't quite make out. */
+  voice(at: { x: number; y: number; z: number }): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.enabled || !this.master || !this.white) return;
+    const t0 = ctx.currentTime + 0.1;
+    const dur = 6.5;
+    const panner = this.panner(at.x, at.y, at.z, 1.5, 1.2, 'HRTF');
+    panner.connect(this.master);
+    const out = ctx.createGain();
+    out.gain.value = 0.9;
+    out.connect(panner);
+
+    const hissSrc = ctx.createBufferSource();
+    hissSrc.buffer = this.white;
+    hissSrc.loop = true;
+    const hissF = ctx.createBiquadFilter();
+    hissF.type = 'bandpass';
+    hissF.frequency.value = 2400;
+    hissF.Q.value = 0.6;
+    const hissG = ctx.createGain();
+    hissG.gain.setValueAtTime(0.0001, t0);
+    hissG.gain.exponentialRampToValueAtTime(0.03, t0 + 0.2);
+    hissG.gain.setValueAtTime(0.03, t0 + dur - 0.4);
+    hissG.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    hissSrc.connect(hissF).connect(hissG).connect(out);
+    hissSrc.start(t0);
+    hissSrc.stop(t0 + dur + 0.1);
+
+    // Syllable-like bursts through two moving formants.
+    const src = ctx.createOscillator();
+    src.type = 'sawtooth';
+    src.frequency.value = 128;
+    const f1 = ctx.createBiquadFilter();
+    f1.type = 'bandpass';
+    f1.Q.value = 6;
+    const f2 = ctx.createBiquadFilter();
+    f2.type = 'bandpass';
+    f2.Q.value = 8;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t0);
+    src.connect(f1);
+    src.connect(f2);
+    f1.connect(env);
+    f2.connect(env);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2600;
+    env.connect(lp).connect(out);
+    let t = t0 + 0.6;
+    while (t < t0 + dur - 0.6) {
+      const len = 0.09 + this.rng() * 0.18;
+      f1.frequency.setValueAtTime(320 + this.rng() * 500, t);
+      f2.frequency.setValueAtTime(1100 + this.rng() * 1300, t);
+      src.frequency.setValueAtTime(110 + this.rng() * 40, t);
+      env.gain.setValueAtTime(0.0001, t);
+      env.gain.exponentialRampToValueAtTime(0.22, t + 0.03);
+      env.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      t += len + (this.rng() < 0.2 ? 0.35 + this.rng() * 0.3 : 0.03 + this.rng() * 0.08);
+    }
+    src.start(t0);
+    src.stop(t0 + dur);
+  }
+
+  private applySeated(timeConstant: number): void {
+    if (!this.ctx || !this.fireBus || !this.windBus || !this.roarFilter) return;
+    const t = this.ctx.currentTime;
+    this.fireBus.gain.setTargetAtTime(this.seated ? 1.3 : 1, t, timeConstant);
+    this.roarFilter.frequency.setTargetAtTime(this.seated ? 700 : 520, t, timeConstant);
+    this.windBus.gain.setTargetAtTime(this.seated ? 0.6 : 1, t, timeConstant * 1.5);
   }
 
   updateListener(pose: Pose): void {
@@ -164,9 +315,13 @@ export class ClearingAudio {
     windFilter.type = 'lowpass';
     windFilter.frequency.value = 380;
     windFilter.Q.value = 0.6;
+    const windBus = ctx.createGain();
+    windBus.gain.value = 1;
+    windBus.connect(master);
+    this.windBus = windBus;
     const windGain = ctx.createGain();
     windGain.gain.value = 0.26;
-    wind.connect(windFilter).connect(windGain).connect(master);
+    wind.connect(windFilter).connect(windGain).connect(windBus);
     this.lfo(0.037, 220, windFilter.frequency);
     this.lfo(0.061, 0.12, windGain.gain);
 
@@ -178,7 +333,7 @@ export class ClearingAudio {
     leafFilter.Q.value = 0.5;
     const leafGain = ctx.createGain();
     leafGain.gain.value = 0.012;
-    leaves.connect(leafFilter).connect(leafGain).connect(master);
+    leaves.connect(leafFilter).connect(leafGain).connect(windBus);
     leafGain.connect(reverbSend);
     this.lfo(0.043, 0.009, leafGain.gain);
 
@@ -201,6 +356,7 @@ export class ClearingAudio {
     roarGain.gain.value = 0.24;
     roar.connect(roarFilter).connect(roarGain).connect(fireBus);
     this.fireRoar = roarGain;
+    this.roarFilter = roarFilter;
     this.lfo(0.27, 0.05, roarGain.gain);
 
     const hiss = this.loop(this.white, 0.7);
@@ -233,6 +389,22 @@ export class ClearingAudio {
         interval: 0.42 + this.rng() * 0.3,
       };
     });
+
+    // A low, beating hum that only carries a short way out of the hollow.
+    const humPanner = this.panner(HOLLOW.x, HOLLOW_FLOOR + 1, HOLLOW.z, 2.5, 1.6, 'HRTF');
+    humPanner.connect(master);
+    const humGain = ctx.createGain();
+    humGain.gain.value = 0.05;
+    humGain.connect(humPanner);
+    for (const f of [55, 55.6, 110.4]) {
+      const osc = ctx.createOscillator();
+      osc.frequency.value = f;
+      osc.connect(humGain);
+      osc.start();
+    }
+    this.lfo(0.09, 0.02, humGain.gain);
+
+    this.applySeated(0.01);
   }
 
   private schedule = () => {

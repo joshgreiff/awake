@@ -15,11 +15,14 @@ import {
 } from 'three';
 import { createFireflies, createMist, type Fireflies, type Mist } from './atmosphere';
 import type { ClearingAudio } from './audio';
-import { FirstPersonController } from './controls';
+import { FirstPersonController, type SeatState } from './controls';
 import { createFire, type FireBuild } from './fire';
 import { createForest } from './forest';
-import { ColliderGrid, MOON_DIR } from './layout';
+import { createHollow, type HollowBuild } from './hollow';
+import { ColliderGrid, MOON_DIR, nearestSeat, seatPose, type Seat } from './layout';
 import { createSky, SKY, type SkyBuild } from './sky';
+import { createSkylight, type Skylight } from './skylight';
+import { Story, type Interaction, type Whisper } from './story';
 import { createGrass, createGround, type GrassUniforms } from './terrain';
 import { createPond, type Pond } from './water';
 
@@ -50,6 +53,12 @@ export interface EngineOptions {
   onLockChange(locked: boolean): void;
   onFirstMove(): void;
   onContextLost(): void;
+  /** Fires when the player walks into or out of reach of a seat. */
+  onNearSeat(near: boolean): void;
+  onSeatChange(state: SeatState): void;
+  /** Label of something nearby the player can interact with, or null. */
+  onNearInteraction(label: string | null): void;
+  onWhisper(whispers: Whisper[]): void;
 }
 
 export class ClearingEngine {
@@ -63,6 +72,10 @@ export class ClearingEngine {
   private readonly fireflies: Fireflies;
   private readonly mist: Mist;
   private readonly pond: Pond;
+  private readonly hollow: HollowBuild;
+  private readonly skylight: Skylight;
+  private readonly story: Story;
+  private interaction: Interaction | null = null;
   private readonly grass: InstancedMesh;
   private readonly grassUniforms: GrassUniforms;
   private readonly container: HTMLElement;
@@ -71,6 +84,8 @@ export class ClearingEngine {
 
   private audio: ClearingAudio | null = null;
   private exploring = false;
+  private paused = false;
+  private nearSeat: Seat | null = null;
   private time = 0;
   private mode: QualityMode;
   private level: number;
@@ -131,6 +146,12 @@ export class ClearingEngine {
     const forest = createForest(colliders);
     this.scene.add(forest.group);
 
+    this.hollow = createHollow(colliders);
+    this.scene.add(this.hollow.group);
+    this.skylight = createSkylight();
+    this.scene.add(this.skylight.group);
+    this.story = new Story(this.hollow, this.skylight, opts.onWhisper);
+
     this.pond = createPond();
     this.scene.add(this.pond.mesh);
 
@@ -150,6 +171,7 @@ export class ClearingEngine {
       reducedMotion: opts.reducedMotion,
       onLockChange: opts.onLockChange,
       onFirstMove: opts.onFirstMove,
+      onSeatChange: this.onSeatChange,
     });
     this.controller.idle(0);
 
@@ -164,13 +186,81 @@ export class ClearingEngine {
 
   setAudio(audio: ClearingAudio | null): void {
     this.audio = audio;
+    audio?.setSeated(this.controller.state !== 'walking');
+    this.story.setAudio(audio);
   }
 
   setExploring(on: boolean): void {
     this.exploring = on;
-    this.controller.enabled = on;
-    if (on) this.requestLock();
-    else this.controller.releaseLock();
+    this.controller.enabled = on && !this.paused;
+    if (on) {
+      this.story.beginVisit();
+      this.requestLock();
+    } else this.controller.releaseLock();
+  }
+
+  /** F / tap: interact with whatever is close, otherwise sit or stand. */
+  primaryAction(): boolean {
+    if (!this.exploring || this.paused) return false;
+    if (this.interaction && this.controller.state === 'walking') {
+      this.story.use(this.interaction.id);
+      this.interaction = null;
+      this.opts.onNearInteraction(null);
+      return true;
+    }
+    return this.toggleSeat();
+  }
+
+  /** Dev/testing only: move the player. */
+  debugTeleport(x: number, z: number, yaw: number, pitch = 0): void {
+    this.controller.teleport(x, z, yaw, pitch);
+  }
+
+  /** Dev/testing only: bring a timed event forward. */
+  debugTrigger(name: 'signal' | 'sky'): void {
+    this.story.debugTrigger(name);
+  }
+
+  /** Re-read persisted world state (used after a testing reset). */
+  reloadWorld(): void {
+    this.story.reload();
+  }
+
+  /** Freeze movement and look input (e.g. while an overlay has focus) and free the cursor. */
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    this.controller.enabled = this.exploring && !paused;
+    this.controller.clearInput();
+    if (paused) this.controller.releaseLock();
+  }
+
+  get seatState(): SeatState {
+    return this.controller.state;
+  }
+
+  /** Sit on the nearby log, or stand if already seated. Returns false if nothing happened. */
+  toggleSeat(): boolean {
+    if (!this.exploring || this.paused) return false;
+    const state = this.controller.state;
+    if (state === 'seated' || state === 'sitting') {
+      this.controller.stand();
+      return true;
+    }
+    if (state === 'walking' && this.nearSeat) {
+      this.controller.sit(seatPose(this.nearSeat, this.controller.position));
+      return true;
+    }
+    return false;
+  }
+
+  stand(): void {
+    this.controller.stand();
+  }
+
+  /** Embers lift from the fire, e.g. after a journal entry is kept. */
+  releaseEmbers(): void {
+    this.fire.releaseEmbers();
+    this.audio?.crackleBurst(7);
   }
 
   requestLock(): void {
@@ -243,6 +333,7 @@ export class ClearingEngine {
     this.camera.updateProjectionMatrix();
     const scale = (h * pr) / (2 * Math.tan((this.camera.fov * Math.PI) / 360));
     this.fire.setPointScale(scale);
+    this.hollow.setPointScale(scale);
     this.sky.setPixelRatio(pr);
     this.fireflies.setPixelRatio(pr);
   }
@@ -274,9 +365,21 @@ export class ClearingEngine {
 
     if (this.exploring) this.controller.update(dt);
     else this.controller.idle(t);
+    this.updateNearSeat();
+    const state = this.controller.state;
+    const pos = this.controller.position;
+    this.story.update(dt, {
+      x: pos.x,
+      z: pos.z,
+      exploring: this.exploring && !this.paused,
+      seated: state === 'seated',
+    });
+    this.updateInteraction();
 
     this.fire.update(t, dt, this.camera);
     this.sky.update(t, dt, this.camera);
+    this.skylight.update(t, dt, this.camera);
+    this.hollow.update(t, dt, this.camera);
     this.fireflies.update(t);
     if (this.mist.group.visible) this.mist.update(t, this.camera);
     this.grassUniforms.uTime.value = t;
@@ -302,6 +405,33 @@ export class ClearingEngine {
 
     this.renderer.render(this.scene, this.camera);
     this.adapt(dt);
+  };
+
+  private updateInteraction(): void {
+    const canAct = this.exploring && !this.paused && this.controller.state === 'walking';
+    const pos = this.controller.position;
+    const next = canAct ? this.story.nearest(pos.x, pos.z) : null;
+    if (next?.id !== this.interaction?.id) this.opts.onNearInteraction(next?.label ?? null);
+    this.interaction = next;
+  }
+
+  private updateNearSeat(): void {
+    const canSit = this.exploring && this.controller.state === 'walking';
+    const pos = this.controller.position;
+    const seat = canSit ? nearestSeat(pos.x, pos.z) : null;
+    if ((seat === null) !== (this.nearSeat === null)) this.opts.onNearSeat(seat !== null);
+    this.nearSeat = seat;
+  }
+
+  private onSeatChange = (state: SeatState) => {
+    if (state === 'sitting') {
+      this.fire.flare(1);
+      this.audio?.setSeated(true);
+      this.audio?.crackleBurst(9);
+    } else if (state === 'standing') {
+      this.audio?.setSeated(false);
+    }
+    this.opts.onSeatChange(state);
   };
 
   private onContextLost = (e: Event) => {

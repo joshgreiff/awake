@@ -12,7 +12,16 @@ import {
   Quaternion,
   Vector3,
 } from 'three';
-import { CLEARING_RADIUS, ColliderGrid, POND, heightAt, openingMask } from './layout';
+import {
+  CLEARING_RADIUS,
+  ColliderGrid,
+  HOLLOW,
+  POND,
+  heightAt,
+  openingMask,
+  scorchAt,
+  trailDistance,
+} from './layout';
 import { fbm, mulberry32, smoothstep, valueNoise } from './noise';
 
 export function createGround(): Mesh {
@@ -32,6 +41,9 @@ export function createGround(): Mesh {
   const needlesB = new Color('#2f2c20');
   const meadow = new Color('#324329');
   const mud = new Color('#1d1f16');
+  const lichen = new Color('#3c4844');
+  const char = new Color('#161311');
+  const worn = new Color('#352d22');
   const tmp = new Color();
   const tmp2 = new Color();
 
@@ -54,6 +66,11 @@ export function createGround(): Mesh {
 
     const pd = Math.hypot(x - POND.x, z - POND.z);
     tmp.lerp(mud, 1 - smoothstep(POND.r * 0.9, POND.r * 1.35, pd));
+
+    const hd = Math.hypot(x - HOLLOW.x, z - HOLLOW.z);
+    tmp.lerp(lichen, (1 - smoothstep(HOLLOW.r - 2, HOLLOW.r + 2.5, hd)) * (0.55 + patch * 0.35));
+    tmp.lerp(char, scorchAt(x, z) * (0.75 + speck * 0.25));
+    tmp.lerp(worn, (1 - smoothstep(0.25, 0.85, trailDistance(x, z))) * 0.45 * smoothstep(2.8, 4.5, r));
 
     const dirtW = 1 - smoothstep(1.6, 3.0 + patch * 0.8, r);
     tmp.lerp(dirt, dirtW);
@@ -179,6 +196,7 @@ export function createGrass(
   const p = new Vector3();
   const s = new Vector3();
   const c = new Color();
+  const tmpSilver = new Color();
 
   let placed = 0;
   let attempts = 0;
@@ -194,13 +212,16 @@ export function createGrass(
     const meadow = open * (1 - smoothstep(22, 32, r));
     const nearFire = smoothstep(1.9, 3.2, r);
     const clump = 0.55 + 0.45 * fbm(x * 0.22, z * 0.22, 2, 11);
-    const p0 = Math.max(inClearing, meadow * 0.9, 0.12) * nearFire * clump;
+    const hollow = 1 - smoothstep(HOLLOW.r - 1.5, HOLLOW.r + 1.5, Math.hypot(x - HOLLOW.x, z - HOLLOW.z));
+    const bare = Math.max(scorchAt(x, z), 1 - smoothstep(0.2, 0.6, trailDistance(x, z)));
+    const p0 = Math.max(inClearing, meadow * 0.9, hollow * 0.55, 0.12) * nearFire * clump * (1 - bare * 0.85);
     if (rng() > p0) continue;
     if (colliders.blocked(x, z, 0.05)) continue;
 
     const pd = Math.hypot(x - POND.x, z - POND.z);
     const reedy = 1 - smoothstep(POND.r * 0.95, POND.r * 1.6, pd);
-    const tall = 0.26 + rng() * 0.34 + meadow * 0.3 * rng() + reedy * (0.5 + rng() * 0.6);
+    const tall =
+      (0.26 + rng() * 0.34 + meadow * 0.3 * rng() + reedy * (0.5 + rng() * 0.6)) * (1 - hollow * 0.45);
     const wide = 0.055 + rng() * 0.04 - reedy * 0.02;
     e.set((rng() - 0.5) * 0.35, rng() * Math.PI * 2, (rng() - 0.5) * 0.25);
     q.setFromEuler(e);
@@ -210,6 +231,7 @@ export function createGrass(
     mesh.setMatrixAt(placed, m);
     const v = 0.7 + rng() * 0.6;
     c.setRGB(v, v * (0.95 + rng() * 0.1), v * (0.85 + rng() * 0.2));
+    if (hollow > 0) c.lerp(tmpSilver.setRGB(v * 1.1, v * 1.25, v * 1.35), hollow * 0.75);
     mesh.setColorAt(placed, c);
     placed++;
   }

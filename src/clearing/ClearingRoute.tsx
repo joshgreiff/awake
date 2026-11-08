@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './clearing.css';
 import { ClearingStill } from './ClearingStill';
+import { JournalPanel } from './JournalPanel';
 import { ClearingAudio } from './engine/audio';
 import { ClearingEngine, detectWebGL, type QualityMode, type WebGLSupport } from './engine/ClearingEngine';
+import { isEditableTarget, type SeatState } from './engine/controls';
+import type { Whisper } from './engine/story';
+import { consumeResetParam, hasBeat, loadWorld, resetWorld } from './worldState';
+
+const RELEASE_DELAY = 1200;
+const WHISPER_FADE = 1100;
 
 type View = 'intro' | 'exploring' | 'still';
 type StillReason = 'unsupported' | 'chosen' | 'error' | 'lost';
@@ -32,12 +39,33 @@ export default function ClearingRoute() {
   const [hasMoved, setHasMoved] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [instructionsGone, setInstructionsGone] = useState(false);
+  const [nearSeat, setNearSeat] = useState(false);
+  const [seatState, setSeatState] = useState<SeatState>('walking');
+  const [journalOpen, setJournalOpen] = useState(false);
+  const [interaction, setInteraction] = useState<string | null>(null);
+  const [whisper, setWhisper] = useState<Whisper | null>(null);
+  const [whisperShown, setWhisperShown] = useState(false);
+  const [returning] = useState(() => {
+    consumeResetParam();
+    const world = loadWorld();
+    return world.visits > 0 && hasBeat(world, 'arrival');
+  });
+  const whisperQueue = useRef<Whisper[]>([]);
+  const [whisperTick, setWhisperTick] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<ClearingEngine | null>(null);
   const audioRef = useRef<ClearingAudio | null>(null);
   const viewRef = useRef(view);
   viewRef.current = view;
+  const seatStateRef = useRef(seatState);
+  seatStateRef.current = seatState;
+  const journalOpenRef = useRef(journalOpen);
+  journalOpenRef.current = journalOpen;
+  const showHelpRef = useRef(showHelp);
+  showHelpRef.current = showHelp;
+  const releasePending = useRef(false);
+  const releaseTimer = useRef<number | null>(null);
 
   const wants3D = view !== 'still' && (support === 'ok' || forced3D);
 
@@ -63,6 +91,13 @@ export default function ClearingRoute() {
           setStillReason('lost');
           setView('still');
         },
+        onNearSeat: setNearSeat,
+        onSeatChange: setSeatState,
+        onNearInteraction: setInteraction,
+        onWhisper: (list) => {
+          whisperQueue.current.push(...list);
+          setWhisperTick((n) => n + 1);
+        },
       });
     } catch (err) {
       console.error('[clearing] failed to start 3D scene', err);
@@ -76,6 +111,10 @@ export default function ClearingRoute() {
     return () => {
       engine.dispose();
       engineRef.current = null;
+      setNearSeat(false);
+      setSeatState('walking');
+      setJournalOpen(false);
+      setInteraction(null);
     };
     // Quality is applied live below; recreating the scene for it would be wasteful.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,6 +123,55 @@ export default function ClearingRoute() {
   useEffect(() => {
     engineRef.current?.setQuality(quality);
   }, [quality]);
+
+  // Show queued whispers one at a time: wait, fade in, hold, fade out.
+  useEffect(() => {
+    if (whisper || whisperQueue.current.length === 0) return;
+    const delay = whisperQueue.current[0].delay ?? 0;
+    const t = window.setTimeout(() => {
+      const next = whisperQueue.current.shift();
+      if (!next) return;
+      setWhisper(next);
+      setWhisperShown(true);
+    }, delay * 1000);
+    return () => window.clearTimeout(t);
+  }, [whisper, whisperTick]);
+
+  useEffect(() => {
+    if (!whisper || !whisperShown) return;
+    const hold = 3800 + whisper.text.length * 45;
+    const t = window.setTimeout(() => setWhisperShown(false), hold);
+    return () => window.clearTimeout(t);
+  }, [whisper, whisperShown]);
+
+  useEffect(() => {
+    if (!whisper || whisperShown) return;
+    const t = window.setTimeout(() => setWhisper(null), WHISPER_FADE);
+    return () => window.clearTimeout(t);
+  }, [whisper, whisperShown]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const w = window as unknown as {
+      __clearing?: {
+        resetWorld(): void;
+        teleport(x: number, z: number, yaw: number, pitch?: number): void;
+        trigger(name: 'signal' | 'sky'): void;
+      };
+    };
+    w.__clearing = {
+      trigger: (name) => engineRef.current?.debugTrigger(name),
+      teleport: (x, z, yaw, pitch) => engineRef.current?.debugTeleport(x, z, yaw, pitch),
+      resetWorld: () => {
+        resetWorld();
+        engineRef.current?.reloadWorld();
+        console.info('[clearing] world state reset (reload the page for a fresh visit)');
+      },
+    };
+    return () => {
+      delete w.__clearing;
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -129,17 +217,72 @@ export default function ClearingRoute() {
     setView('intro');
   }, []);
 
+  const openJournal = useCallback(() => {
+    if (seatStateRef.current !== 'seated' || journalOpenRef.current) return;
+    engineRef.current?.setPaused(true);
+    setShowHelp(false);
+    setJournalOpen(true);
+  }, []);
+
+  const closeJournal = useCallback((relock: boolean) => {
+    if (releaseTimer.current !== null) {
+      window.clearTimeout(releaseTimer.current);
+      releaseTimer.current = null;
+    }
+    const engine = engineRef.current;
+    setJournalOpen(false);
+    if (!engine) return;
+    engine.setPaused(false);
+    if (releasePending.current) {
+      releasePending.current = false;
+      engine.releaseEmbers();
+    }
+    if (relock && !touch) engine.requestLock();
+  }, [touch]);
+
+  const onEntrySaved = useCallback(() => {
+    releasePending.current = true;
+    if (releaseTimer.current !== null) window.clearTimeout(releaseTimer.current);
+    releaseTimer.current = window.setTimeout(() => closeJournal(false), RELEASE_DELAY);
+  }, [closeJournal]);
+
+  useEffect(() => () => {
+    if (releaseTimer.current !== null) window.clearTimeout(releaseTimer.current);
+  }, []);
+
+  const toggleSeat = useCallback(() => {
+    engineRef.current?.primaryAction();
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (journalOpenRef.current) {
+        if (e.code === 'Escape') {
+          e.preventDefault();
+          closeJournal(false);
+        }
+        return;
+      }
+      if (isEditableTarget(e.target) || e.repeat) return;
+      const seated = seatStateRef.current === 'seated' || seatStateRef.current === 'sitting';
       if (e.code === 'KeyM') toggleSound();
       else if (e.code === 'KeyH' || e.key === '?') setShowHelp((v) => !v);
-      else if (e.code === 'Escape') setShowHelp(false);
-      else if (e.code === 'Enter' && viewRef.current === 'intro' && (support === 'ok' || forced3D)) stepIn();
+      else if (e.code === 'Escape') {
+        if (showHelpRef.current) setShowHelp(false);
+        else if (seated) engineRef.current?.stand();
+      } else if (e.code === 'KeyF' && viewRef.current === 'exploring') {
+        e.preventDefault();
+        toggleSeat();
+      } else if (e.code === 'KeyJ' && seatStateRef.current === 'seated') {
+        // Keep the keystroke from landing in the journal as it gains focus.
+        e.preventDefault();
+        openJournal();
+      } else if (e.code === 'Enter' && viewRef.current === 'intro' && (support === 'ok' || forced3D)) stepIn();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [toggleSound, stepIn, support, forced3D]);
+  }, [toggleSound, stepIn, support, forced3D, closeJournal, openJournal, toggleSeat]);
 
   const cycleQuality = () => {
     setQuality((q) => (q === 'auto' ? 'high' : q === 'high' ? 'low' : 'auto'));
@@ -238,8 +381,9 @@ export default function ClearingRoute() {
                 className="mb-6 text-base leading-relaxed text-[#f3eadb]/80 sm:text-lg"
                 style={{ fontFamily: "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif" }}
               >
-                A small clearing at the edge of the forest. Someone left the fire going. There is
-                nothing to do here. Stay as long as you like.
+                {returning
+                  ? 'The fire is still going. You don’t remember leaving it. Stay as long as you like.'
+                  : 'A small clearing at the edge of the forest. Someone left the fire going. There is nothing to do here. Stay as long as you like.'}
               </p>
 
               {support === 'slow' && !forced3D ? (
@@ -297,7 +441,7 @@ export default function ClearingRoute() {
           </div>
         )}
 
-        {view === 'exploring' && !touch && !locked && !showHelp && (
+        {view === 'exploring' && !touch && !locked && !showHelp && !journalOpen && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="clearing-hint rounded-full px-4 py-2 text-sm text-[#f3eadb]/85">
               Click to look around
@@ -305,7 +449,73 @@ export default function ClearingRoute() {
           </div>
         )}
 
-        {view === 'exploring' && !instructionsGone && !showHelp && (
+        {whisper && (
+          <div
+            className="clearing-whisper-wrap absolute inset-x-0 flex justify-center px-6"
+            style={{ opacity: whisperShown ? 1 : 0 }}
+            aria-live="polite"
+          >
+            <p className={`clearing-whisper is-${whisper.kind}`}>{whisper.text}</p>
+          </div>
+        )}
+
+        {view === 'exploring' && !journalOpen && !showHelp && seatState === 'walking' && (interaction || nearSeat) && (
+          <div className={`absolute inset-x-0 flex justify-center px-4 ${instructionsGone ? 'bottom-10' : 'bottom-24'}`}>
+            {touch ? (
+              <button
+                type="button"
+                onClick={toggleSeat}
+                className="clearing-seat-prompt clearing-button pointer-events-auto rounded-full px-5 py-2.5 text-sm"
+              >
+                {interaction ?? 'Sit by the fire'}
+              </button>
+            ) : (
+              <div className="clearing-seat-prompt rounded-full px-4 py-2 text-sm text-[#f7ecdc]">
+                <kbd className="clearing-kbd">F</kbd> <span className="text-[#f3eadb]/60">·</span>{' '}
+                {interaction ?? 'Sit by the fire'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === 'exploring' && !journalOpen && !showHelp && seatState === 'seated' && (
+          <div className="absolute inset-x-0 bottom-10 flex justify-center px-4">
+            {touch ? (
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={openJournal}
+                  className="clearing-seat-prompt clearing-button pointer-events-auto rounded-full px-5 py-2.5 text-sm"
+                >
+                  Open journal
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleSeat}
+                  className="clearing-seat-prompt clearing-button pointer-events-auto rounded-full px-5 py-2.5 text-sm"
+                >
+                  Stand up
+                </button>
+              </div>
+            ) : (
+              <div className="clearing-seat-prompt flex items-center gap-2 rounded-full px-4 py-2 text-sm text-[#f7ecdc]">
+                <span>
+                  <kbd className="clearing-kbd">J</kbd> journal
+                </span>
+                <span className="text-[#f3eadb]/40" aria-hidden>·</span>
+                <span className="text-[#f3eadb]/75">
+                  <kbd className="clearing-kbd">F</kbd> stand
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {journalOpen && (
+          <JournalPanel onClose={() => closeJournal(true)} onSaved={onEntrySaved} />
+        )}
+
+        {view === 'exploring' && !instructionsGone && !showHelp && !journalOpen && seatState === 'walking' && (
           <div
             className="absolute inset-x-0 bottom-6 flex justify-center px-4 transition-opacity duration-1000"
             style={{ opacity: hasMoved ? 0 : 1 }}
@@ -324,6 +534,7 @@ export default function ClearingRoute() {
                 <ul className="space-y-1.5">
                   <li>Hold and drag on the left half of the screen to walk.</li>
                   <li>Drag on the right half to look around.</li>
+                  <li>Walk up to a log by the fire to sit and write.</li>
                 </ul>
               ) : (
                 <ul className="space-y-1.5">
@@ -331,7 +542,9 @@ export default function ClearingRoute() {
                   <li>Mouse to look (click the scene first)</li>
                   <li><kbd className="clearing-kbd">Q</kbd> <kbd className="clearing-kbd">E</kbd> or ← → to turn without a mouse</li>
                   <li><kbd className="clearing-kbd">Shift</kbd> to wander faster</li>
-                  <li><kbd className="clearing-kbd">Esc</kbd> to free the cursor</li>
+                  <li><kbd className="clearing-kbd">F</kbd> near a log to sit by the fire, again to stand, or to look at something closely</li>
+                  <li><kbd className="clearing-kbd">J</kbd> while seated to open your journal</li>
+                  <li><kbd className="clearing-kbd">Esc</kbd> to free the cursor, then to stand</li>
                 </ul>
               )}
               <ul className="mt-3 space-y-1.5 text-[#f3eadb]/65">

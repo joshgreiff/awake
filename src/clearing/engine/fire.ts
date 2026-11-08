@@ -22,15 +22,21 @@ import { mulberry32, valueNoise } from './noise';
 export interface FireBuild {
   group: Group;
   light: PointLight;
-  /** Current flicker multiplier, ~0.75–1.1. Shared with grass lighting and audio. */
+  /** Current flicker multiplier, ~0.75–1.1 (briefly higher during a flare). Shared with grass lighting and audio. */
   intensity: number;
   update(time: number, dt: number, camera: PerspectiveCamera): void;
   setPointScale(scale: number): void;
   setSmokeEnabled(on: boolean): void;
+  /** Brief swell of flame and light, with a puff of embers. `strength` ~0–1. */
+  flare(strength: number): void;
+  /** A slow, lingering drift of embers released upward. */
+  releaseEmbers(): void;
 }
 
 const FLAME_COUNT = 110;
-const EMBER_COUNT = 60;
+const STEADY_EMBERS = 60;
+const BURST_EMBERS = 40;
+const EMBER_COUNT = STEADY_EMBERS + BURST_EMBERS;
 const SMOKE_COUNT = 22;
 const LIGHT_BASE = 20;
 
@@ -195,7 +201,27 @@ export function createFire(colliders: ColliderGrid): FireBuild {
     emberAge[i] = initial ? rng() * emberLifeSpan[i] : 0;
     emberSeed[i] = rng();
   };
-  for (let i = 0; i < EMBER_COUNT; i++) spawnEmber(i, true);
+  for (let i = 0; i < STEADY_EMBERS; i++) spawnEmber(i, true);
+  for (let i = STEADY_EMBERS; i < EMBER_COUNT; i++) {
+    emberLifeSpan[i] = 1;
+    emberAge[i] = 1;
+    emberLife[i] = 1;
+    emberPos[i * 3 + 1] = -10;
+  }
+  let burstCursor = 0;
+  const burstEmbers = (count: number, lift: number, linger: number) => {
+    for (let n = 0; n < count; n++) {
+      const i = STEADY_EMBERS + burstCursor;
+      burstCursor = (burstCursor + 1) % BURST_EMBERS;
+      spawnEmber(i, false);
+      emberVel[i * 3] *= 1.8;
+      emberVel[i * 3 + 2] *= 1.8;
+      emberVel[i * 3 + 1] = (0.9 + rng() * 1.1) * lift;
+      emberLifeSpan[i] = (1.6 + rng() * 2.2) * linger;
+      emberAge[i] = -n * 0.035;
+    }
+  };
+  let flareAmt = 0;
   const emberGeo = new BufferGeometry();
   emberGeo.setAttribute('position', new BufferAttribute(emberPos, 3));
   emberGeo.setAttribute('aLife', new BufferAttribute(emberLife, 1));
@@ -341,14 +367,16 @@ export function createFire(colliders: ColliderGrid): FireBuild {
     update(time, dt, camera) {
       const n = valueNoise(time * 6.5, 0.5, 3);
       const n2 = valueNoise(time * 1.3, 4.2, 8);
-      const flicker = 0.78 + n * 0.22 + n2 * 0.12 + Math.sin(time * 9.7) * 0.025;
+      flareAmt *= Math.exp(-dt * 1.4);
+      const swell = 1 + flareAmt * 0.4;
+      const flicker = (0.78 + n * 0.22 + n2 * 0.12 + Math.sin(time * 9.7) * 0.025) * swell;
       build.intensity = flicker;
       light.intensity = LIGHT_BASE * flicker;
-      light.position.set((n - 0.5) * 0.12, 0.95 + n2 * 0.2, (n2 - 0.5) * 0.12);
-      charMat.emissiveIntensity = 0.22 + n * 0.25;
+      light.position.set((n - 0.5) * 0.12, 0.95 + n2 * 0.2 + flareAmt * 0.15, (n2 - 0.5) * 0.12);
+      charMat.emissiveIntensity = (0.22 + n * 0.25) * (1 + flareAmt);
       bedMat.uniforms.uTime.value = time;
-      bedMat.uniforms.uI.value = 0.7 + n2 * 0.4;
-      flameMat.uniforms.uI.value = 0.85 + n * 0.3;
+      bedMat.uniforms.uI.value = (0.7 + n2 * 0.4) * (1 + flareAmt * 0.6);
+      flameMat.uniforms.uI.value = (0.85 + n * 0.3) * (1 + flareAmt * 0.3);
       glowMat.uniforms.uI.value = flicker;
       smokeMat.uniforms.uI.value = flicker;
       emberMat.uniforms.uTime.value = time;
@@ -366,16 +394,25 @@ export function createFire(colliders: ColliderGrid): FireBuild {
         flamePos[k + 1] += flameVel[k + 1] * dt;
         flamePos[k + 2] += flameVel[k + 2] * dt;
         flameLife[i] = t;
-        flameSize[i] = flameSize0[i] * (1 - t * 0.65);
+        flameSize[i] = flameSize0[i] * (1 - t * 0.65) * (1 + flareAmt * 0.35);
       }
       flameGeo.attributes.position.needsUpdate = true;
       flameGeo.attributes.aLife.needsUpdate = true;
       flameGeo.attributes.aSize.needsUpdate = true;
 
       for (let i = 0; i < EMBER_COUNT; i++) {
+        const dormant = emberAge[i] >= emberLifeSpan[i];
+        if (i >= STEADY_EMBERS && dormant) {
+          emberLife[i] = 1;
+          continue;
+        }
         emberAge[i] += dt;
-        if (emberAge[i] >= emberLifeSpan[i]) spawnEmber(i, false);
+        if (dormant) spawnEmber(i, false);
         const k = i * 3;
+        if (emberAge[i] < 0) {
+          emberLife[i] = 0;
+          continue;
+        }
         emberVel[k] += Math.sin(time * 1.7 + emberSeed[i] * 30) * 0.4 * dt;
         emberVel[k + 2] += Math.cos(time * 1.3 + emberSeed[i] * 17) * 0.4 * dt;
         emberVel[k + 1] *= 1 - 0.25 * dt;
@@ -412,6 +449,14 @@ export function createFire(colliders: ColliderGrid): FireBuild {
     setSmokeEnabled(on) {
       smokeEnabled = on;
       smoke.visible = on;
+    },
+    flare(strength) {
+      flareAmt = Math.max(flareAmt, strength);
+      burstEmbers(Math.round(16 * strength), 1.25, 0.8);
+    },
+    releaseEmbers() {
+      flareAmt = Math.max(flareAmt, 0.3);
+      burstEmbers(28, 0.8, 1.5);
     },
   };
   return build;

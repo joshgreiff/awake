@@ -17,13 +17,26 @@ import {
   type Material,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { CLEARING_RADIUS, ColliderGrid, POND, heightAt, openingMask } from './layout';
+import {
+  CLEARING_RADIUS,
+  ColliderGrid,
+  LOG_CENTER_HEIGHT,
+  LOG_RADIUS,
+  POND,
+  SEATS,
+  heightAt,
+  openingMask,
+  seatAngle,
+  seatAxis,
+  treeExcluded,
+  treeLean,
+} from './layout';
 import { hash2, mulberry32, smoothstep } from './noise';
 
 /** Trees closer than this to the fire cast firelight shadows. */
 const SHADOW_RADIUS = 22;
 
-function jitterVertices(geo: BufferGeometry, amount: number, seed: number): BufferGeometry {
+export function jitterVertices(geo: BufferGeometry, amount: number, seed: number): BufferGeometry {
   const pos = geo.attributes.position as BufferAttribute;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
@@ -284,6 +297,12 @@ export function createForest(colliders: ColliderGrid): ForestBuild {
   const p = new Vector3();
   const s = new Vector3();
   const c = new Color();
+  const leanAxis = new Vector3();
+  const leanQ = new Quaternion();
+  // Colliders of trees left out of the gaps; only used so later placement checks match.
+  const ghosts = new ColliderGrid();
+  const placementBlocked = (x: number, z: number, pad: number) =>
+    colliders.blocked(x, z, pad) || ghosts.blocked(x, z, pad);
 
   for (const id of Object.keys(species) as SpeciesId[]) {
     const sp = species[id];
@@ -293,22 +312,40 @@ export function createForest(colliders: ColliderGrid): ForestBuild {
       if (items.length === 0) continue;
       const trunks = new InstancedMesh(sp.trunk, sp.trunkMat, items.length);
       const crowns = sp.crown && sp.crownMat ? new InstancedMesh(sp.crown, sp.crownMat, items.length) : null;
-      items.forEach((t, i) => {
+      // Trees in the hollow/trail gaps still draw their random numbers so every other
+      // tree, rock and shrub keeps exactly the placement it had before those areas existed.
+      let placed = 0;
+      items.forEach((t) => {
         e.set((rng() - 0.5) * 0.06, t.rot, (rng() - 0.5) * 0.06);
+        sp.trunkColor(c, rng);
+        const trunkColor = c.clone();
+        if (crowns) sp.crownColor(c, rng);
+        if (treeExcluded(t.x, t.z)) {
+          ghosts.add({ x: t.x, z: t.z, r: sp.trunkRadius * t.s + 0.15 });
+          return;
+        }
         q.setFromEuler(e);
+        const lean = treeLean(t.x, t.z);
+        const tilt = Math.hypot(lean.x, lean.z);
+        if (tilt > 1e-3) {
+          leanAxis.set(lean.z / tilt, 0, -lean.x / tilt);
+          leanQ.setFromAxisAngle(leanAxis, tilt);
+          q.premultiply(leanQ);
+        }
         p.set(t.x, heightAt(t.x, t.z) - 0.2, t.z);
         s.set(t.s, t.sy, t.s);
         m.compose(p, q, s);
-        trunks.setMatrixAt(i, m);
-        sp.trunkColor(c, rng);
-        trunks.setColorAt(i, c);
+        trunks.setMatrixAt(placed, m);
+        trunks.setColorAt(placed, trunkColor);
         if (crowns) {
-          crowns.setMatrixAt(i, m);
-          sp.crownColor(c, rng);
-          crowns.setColorAt(i, c);
+          crowns.setMatrixAt(placed, m);
+          crowns.setColorAt(placed, c);
         }
+        placed++;
         colliders.add({ x: t.x, z: t.z, r: sp.trunkRadius * t.s + 0.15 });
       });
+      trunks.count = placed;
+      if (crowns) crowns.count = placed;
       for (const mesh of crowns ? [trunks, crowns] : [trunks]) {
         mesh.computeBoundingSphere();
         mesh.castShadow = near;
@@ -359,12 +396,13 @@ export function createForest(colliders: ColliderGrid): ForestBuild {
     const x = Math.sin(a) * r;
     const z = -Math.cos(a) * r;
     if (openingMask(x, z) > 0.5 && r < 24) continue;
-    if (colliders.blocked(x, z, 0.3)) continue;
+    if (placementBlocked(x, z, 0.3)) continue;
     const sc = 0.35 + rng() * 0.5;
     e.set(0, rng() * 6.28, 0);
     q.setFromEuler(e);
     p.set(x, heightAt(x, z) + sc * 0.15, z);
     s.set(sc * (1 + rng() * 0.6), sc * (0.55 + rng() * 0.3), sc * (1 + rng() * 0.6));
+    if (treeExcluded(x, z)) s.setScalar(0);
     m.compose(p, q, s);
     shrubs.setMatrixAt(placedShrubs, m);
     c.setHSL(0.27 + rng() * 0.1, 0.3 + rng() * 0.15, 0.055 + rng() * 0.035);
@@ -386,6 +424,7 @@ export function createForest(colliders: ColliderGrid): ForestBuild {
     q.setFromEuler(e);
     p.set(x, heightAt(x, z) + sc * sink, z);
     s.set(sc * (0.9 + rng() * 0.5), sc * (0.5 + rng() * 0.35), sc * (0.9 + rng() * 0.5));
+    if (treeExcluded(x, z)) s.setScalar(0);
     m.compose(p, q, s);
     rocks.setMatrixAt(placedRocks, m);
     const g = 0.12 + rng() * 0.06;
@@ -403,10 +442,14 @@ export function createForest(colliders: ColliderGrid): ForestBuild {
     const r = 6 + rng() * 24;
     const x = Math.sin(a) * r;
     const z = -Math.cos(a) * r;
-    if (colliders.blocked(x, z, 0.8)) continue;
+    if (placementBlocked(x, z, 0.8)) continue;
     const sc = 0.4 + Math.pow(rng(), 2) * 1.5;
     placeRock(x, z, sc, 0.12);
-    if (sc > 0.7) colliders.add({ x, z, r: sc * 0.6 });
+    if (sc > 0.7) {
+      const rock = { x, z, r: sc * 0.6 };
+      if (treeExcluded(x, z)) ghosts.add(rock);
+      else colliders.add(rock);
+    }
   }
   rocks.count = placedRocks;
   rocks.computeBoundingSphere();
@@ -416,24 +459,18 @@ export function createForest(colliders: ColliderGrid): ForestBuild {
 
   // Two logs to sit on, angled toward the fire.
   const logMat = new MeshLambertMaterial({ color: '#3a2d25' });
-  const logGeo = jitterVertices(new CylinderGeometry(0.27, 0.3, 2.6, 9, 1), 0.03, 44);
-  const seats = [
-    { x: -2.7, z: 1.1, len: 2.6 },
-    { x: 2.5, z: -1.6, len: 2.2 },
-  ];
-  for (const seat of seats) {
+  const logGeo = jitterVertices(new CylinderGeometry(0.27, LOG_RADIUS, 2.6, 9, 1), 0.03, 44);
+  for (const seat of SEATS) {
     const log = new Mesh(logGeo, logMat);
-    const angle = Math.atan2(seat.x, seat.z);
     log.scale.set(1, seat.len / 2.6, 1);
-    log.rotation.set(0, angle, Math.PI / 2, 'YXZ');
-    log.position.set(seat.x, heightAt(seat.x, seat.z) + 0.24, seat.z);
+    log.rotation.set(0, seatAngle(seat), Math.PI / 2, 'YXZ');
+    log.position.set(seat.x, heightAt(seat.x, seat.z) + LOG_CENTER_HEIGHT, seat.z);
     log.castShadow = true;
     log.receiveShadow = true;
     group.add(log);
-    const dirX = Math.cos(angle);
-    const dirZ = -Math.sin(angle);
+    const axis = seatAxis(seat);
     for (const t of [-0.38, 0, 0.38]) {
-      colliders.add({ x: seat.x + dirX * t * seat.len, z: seat.z + dirZ * t * seat.len, r: 0.42 });
+      colliders.add({ x: seat.x + axis.x * t * seat.len, z: seat.z + axis.z * t * seat.len, r: 0.42 });
     }
   }
 
